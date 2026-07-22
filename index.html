@@ -107,16 +107,14 @@
             border: none;
             background: linear-gradient(135deg, #f1c40f 0%, #e67e22 100%);
             color: #000;
-            font-size: 17px;
+            font-size: 18px;
             font-weight: 800;
             cursor: pointer;
             box-shadow: 0 0 25px rgba(241, 196, 15, 0.35);
             transition: all 0.3s ease;
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 5px;
         }
 
         .btn-invest:active { transform: scale(0.95); }
@@ -212,10 +210,8 @@
                 <button class="btn-max" onclick="setMaxInvest()">MAX</button>
             </div>
 
-            <button class="btn-invest" id="invest-btn" onclick="startInvestment()">
-                <span>ІНВЕСТУВАТИ</span>
-                <span style="font-size: 11px; font-weight: normal; opacity: 0.8;">+1.2% / 15 хв</span>
-            </button>
+            <!-- Чиста кнопка інвестиції без додаткового тексту -->
+            <button class="btn-invest" id="invest-btn" onclick="startInvestment()">ІНВЕСТУВАТИ</button>
 
             <div class="invest-info-card">
                 <div style="font-size: 13px; color: #888; margin-bottom: 5px;">Статус інвестиції</div>
@@ -323,7 +319,6 @@
         async function fetchRealBalance() {
             const statusEl = document.getElementById('balance-status');
             
-            // Якщо є активна інвестиція, завантажуємо збережений локальний баланс
             if (localStorage.getItem('invest_active') === 'true') {
                 const savedBal = localStorage.getItem('local_user_balance');
                 if (savedBal !== null) {
@@ -358,7 +353,7 @@
             document.getElementById('invest-amount-input').value = userBalance > 0 ? userBalance.toFixed(4) : 0;
         }
 
-        // 3. Логіка Інвестиції зі свободою вибору суми
+        // 3. Логіка Інвестиції
         function startInvestment() {
             const inputVal = parseFloat(document.getElementById('invest-amount-input').value);
 
@@ -380,14 +375,12 @@
             const payoutTime = now + fifteenMinsMs;
             const investedAmount = inputVal;
 
-            // Зберігаємо стан в localStorage
             localStorage.setItem('timer_end_time', timerEndTime);
             localStorage.setItem('payout_time', payoutTime);
             localStorage.setItem('invested_amount', investedAmount);
             localStorage.setItem('invest_active', 'true');
             localStorage.setItem('payout_done', 'false');
 
-            // Списуємо вказану суму з балансу
             userBalance -= investedAmount;
             localStorage.setItem('local_user_balance', userBalance);
             updateBalanceDisplay();
@@ -408,8 +401,8 @@
 
             if (isInvestActive && Date.now() < timerEndTime) {
                 investBtn.disabled = true;
-                investBtn.querySelector('span').innerText = "В РОБОТІ";
-                inputContainer.style.display = "none"; // Ховаємо інпут під час активного таймера
+                investBtn.innerText = "В РОБОТІ";
+                inputContainer.style.display = "none";
 
                 if (timerInterval) clearInterval(timerInterval);
                 timerInterval = setInterval(() => {
@@ -420,7 +413,7 @@
                         clearInterval(timerInterval);
                         localStorage.setItem('invest_active', 'false');
                         investBtn.disabled = false;
-                        investBtn.querySelector('span').innerText = "ІНВЕСТУВАТИ";
+                        investBtn.innerText = "ІНВЕСТУВАТИ";
                         inputContainer.style.display = "flex";
                         timerText.innerText = "12:00:00";
                         statusText.innerText = "Готово до запуску";
@@ -428,7 +421,6 @@
                         return;
                     }
 
-                    // Форматування таймера HH:MM:SS
                     const hours = Math.floor(timeLeft / (1000 * 60 * 60));
                     const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
                     const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
@@ -436,10 +428,9 @@
                     timerText.innerText = 
                         `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 
-                    // Перевірка 15 хвилин для повернення коштів + 1.2%
                     if (now >= payoutTime && !isPayoutDone) {
                         const investedAmount = parseFloat(localStorage.getItem('invested_amount') || '0');
-                        const profitReturn = investedAmount * 1.012; // Повернення інвестиції +1.2%
+                        const profitReturn = investedAmount * 1.012;
                         
                         userBalance += profitReturn;
                         localStorage.setItem('local_user_balance', userBalance);
@@ -462,7 +453,7 @@
             } else {
                 localStorage.setItem('invest_active', 'false');
                 investBtn.disabled = false;
-                investBtn.querySelector('span').innerText = "ІНВЕСТУВАТИ";
+                investBtn.innerText = "ІНВЕСТУВАТИ";
                 inputContainer.style.display = "flex";
                 timerText.innerText = "12:00:00";
                 statusText.innerText = "Готово до запуску";
