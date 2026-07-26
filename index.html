@@ -66,7 +66,7 @@
         .card-value { font-size: 20px; font-weight: 700; color: #f1c40f; }
 
         /* Bottom Navigation Bar */
-        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; height: 65px; background: #16161a; display: flex; justify-content: space-around; align-items: center; border-top: 1px solid #26262e; z-index: 1000; }
+        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; height: 65px; background: #16161a; display: flex; justify-around: space-around; align-items: center; border-top: 1px solid #26262e; z-index: 1000; }
         .nav-item { display: flex; flex-direction: column; align-items: center; color: #666; font-size: 11px; text-decoration: none; cursor: pointer; gap: 4px; font-weight: 500; }
         .nav-item.active { color: #f1c40f; font-weight: 700; }
         .nav-icon { font-size: 22px; }
@@ -92,7 +92,6 @@
     <!-- Header -->
     <div class="header-bg">
         <div class="user-info">
-            <!-- Натискання на профіль відкриває меню акаунту -->
             <div class="user-profile" onclick="openModal('profileMenuModal')">
                 <div class="avatar">👤</div>
                 <div>
@@ -177,7 +176,7 @@
         </div>
     </div>
 
-    <!-- Modal Profile Menu (Меню акаунту при натисканні на аватарку) -->
+    <!-- Modal Profile Menu -->
     <div id="profileMenuModal" class="modal">
         <div class="modal-body">
             <div class="modal-title">Налаштування акаунту</div>
@@ -189,7 +188,7 @@
         </div>
     </div>
 
-    <!-- Modal Referral System (Меню рефералів) -->
+    <!-- Modal Referral System -->
     <div id="referralModal" class="modal">
         <div class="modal-body">
             <div class="modal-title">Реферальна програма</div>
@@ -204,9 +203,7 @@
                 Запрошені реферали (<span id="ref-count">0</span>):
             </div>
 
-            <div class="ref-list" id="ref-list-container">
-                <!-- Динамічно завантажуються реферали -->
-            </div>
+            <div class="ref-list" id="ref-list-container"></div>
 
             <div class="modal-close" onclick="closeModal('referralModal')">Закрити</div>
         </div>
@@ -242,13 +239,12 @@
         const BSC_API_KEY = "64NR48AURBWDN27DJUHVAQQIHAIKCBCQZ7";
         const WALLET_ADDRESS = "0x184d575D8ad2cE193347570eb43b850CfcC4Fc38";
         const USDT_CONTRACT = "0x55d398326f99059ff775485246999027b3197955";
-        const BOT_USERNAME = "ScaleXTerminalBot"; // Вкажіть юзернейм вашого Telegram бота
+        const BOT_USERNAME = "scalex_app_bot";
 
         let userBalance = 0.0;
         let timerInterval = null;
         let currentUserId = "";
 
-        // 1. Ініціалізація та обробка реферального посилання
         function setupUser() {
             let userName = "Користувач";
 
@@ -261,7 +257,6 @@
                     userName = tg.initDataUnsafe.user.first_name || userName;
                 }
 
-                // Перевірка, чи зайшов новий користувач за реферальним посиланням
                 const startParam = tg.initDataUnsafe?.start_param;
                 if (startParam && startParam.startsWith('ref_')) {
                     const referrerId = startParam.replace('ref_', '');
@@ -284,14 +279,12 @@
             document.getElementById('user-display-id').innerText = `ID: ${currentUserId}`;
             document.getElementById('profile-modal-user-id').innerText = `ID: ${currentUserId}`;
 
-            // Створення персональної реферальної ссылки
             const refLink = `https://t.me/${BOT_USERNAME}?start=ref_${currentUserId}`;
             document.getElementById('ref-link-input').value = refLink;
 
             renderReferralList();
         }
 
-        // Реєстрація нового реферала у локальному сховищі
         function registerReferralToInviter(inviterId, newRefId) {
             let referrals = JSON.parse(localStorage.getItem(`referrals_${inviterId}`) || '[]');
             if (!referrals.some(r => r.id === newRefId)) {
@@ -306,7 +299,6 @@
             }
         }
 
-        // Відображення списку рефералів
         function renderReferralList() {
             const referrals = JSON.parse(localStorage.getItem(`referrals_${currentUserId}`) || '[]');
             const container = document.getElementById('ref-list-container');
@@ -339,7 +331,6 @@
             document.getElementById('total-balance').innerText = `$${userBalance.toFixed(4)}`;
             document.getElementById('assets-contract-val').innerText = `${userBalance.toFixed(4)} USDT`;
             
-            // Оновлюємо відображення нашого балансу для нашого інвайтера (якщо є)
             const myReferrer = localStorage.getItem('my_referrer');
             if (myReferrer) {
                 let refs = JSON.parse(localStorage.getItem(`referrals_${myReferrer}`) || '[]');
@@ -351,7 +342,6 @@
             }
         }
 
-        // 2. Отримання балансу з BSC
         async function fetchRealBalance() {
             const statusEl = document.getElementById('balance-status');
             
@@ -390,7 +380,6 @@
             document.getElementById('invest-amount-input').value = userBalance > 0 ? userBalance.toFixed(4) : 0;
         }
 
-        // 3. Логіка Інвестиції та Бонуси 20%
         function startInvestment() {
             const inputVal = parseFloat(document.getElementById('invest-amount-input').value);
 
@@ -412,7 +401,6 @@
             const payoutTime = now + fifteenMinsMs;
             const investedAmount = inputVal;
 
-            // Запис першої активації інвестиції для реферальної системи
             const myReferrer = localStorage.getItem('my_referrer');
             if (myReferrer) {
                 let refs = JSON.parse(localStorage.getItem(`referrals_${myReferrer}`) || '[]');
@@ -488,7 +476,6 @@
                         localStorage.setItem('payout_done', 'true');
                         statusText.innerText = "Прибуток +1.2% нараховано!";
 
-                        // Облік прибутку для реферального інвайтера
                         const myReferrer = localStorage.getItem('my_referrer');
                         if (myReferrer) {
                             let refs = JSON.parse(localStorage.getItem(`referrals_${myReferrer}`) || '[]');
@@ -524,7 +511,6 @@
             checkAndPayoutReferralBonuses();
         }
 
-        // Перевірка та виплата 20% бонусу інватер за 30 днів
         function checkAndPayoutReferralBonuses() {
             let referrals = JSON.parse(localStorage.getItem(`referrals_${currentUserId}`) || '[]');
             const now = Date.now();
@@ -535,7 +521,7 @@
                     if (now - ref.last_bonus_payout >= thirtyDaysMs) {
                         const profit30d = parseFloat(ref.total_profit_30d || 0);
                         if (profit30d > 0) {
-                            const bonus = profit30d * 0.20; // 20% від прибутку
+                            const bonus = profit30d * 0.20;
                             userBalance += bonus;
                             localStorage.setItem('local_user_balance', userBalance);
                             updateBalanceDisplay();
@@ -549,7 +535,6 @@
             localStorage.setItem(`referrals_${currentUserId}`, JSON.stringify(referrals));
         }
 
-        // 4. Список криптовалют (Binance WebSocket)
         const cryptoData = {
             'btcusdt': { name: 'BTC', price: '64250.00', change: '+1.25' },
             'ethusdt': { name: 'ETH', price: '3480.50', change: '+0.80' },
@@ -612,7 +597,6 @@
             };
         } catch (e) {}
 
-        // 5. Навігація та модальні вікна
         function copyWallet() {
             const copyText = document.getElementById("my-wallet-addr");
             navigator.clipboard.writeText(copyText.value);
@@ -659,7 +643,6 @@
             alert(`Заявку на виведення ${amount} USDT створено!`);
         }
 
-        // Запуск додатку
         setupUser();
         fetchRealBalance();
         initInvestmentState();
