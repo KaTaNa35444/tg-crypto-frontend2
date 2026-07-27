@@ -7,7 +7,7 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
-        body { background-color: #121212; color: #ffffff; padding-bottom: 80px; user-select: none; }
+        body { background-color: #121212; color: #ffffff; padding-bottom: 90px; user-select: none; }
         
         /* Top Bar & Header */
         .header-bg { background: linear-gradient(180deg, #2c0808 0%, #121212 100%); padding: 16px; border-bottom: 1px solid #222; }
@@ -25,7 +25,7 @@
         .assets-change { font-size: 12px; color: #f1c40f; font-weight: 500; display: flex; align-items: center; gap: 5px; }
 
         /* Quick Action Buttons */
-        .action-buttons { display: flex; justify-content: space-around; margin: 18px 0 10px 0; padding: 0 10px; }
+        .action-buttons { display: flex; justify-content: center; gap: 40px; margin: 18px 0 10px 0; padding: 0 10px; }
         .action-btn { display: flex; flex-direction: column; align-items: center; gap: 6px; background: none; border: none; color: #ccc; font-size: 12px; cursor: pointer; transition: color 0.2s; }
         .action-btn:active { color: #f1c40f; }
         .icon-circle { width: 48px; height: 48px; border-radius: 50%; background: #1e1e24; display: flex; align-items: center; justify-content: center; font-size: 20px; border: 1px solid #2a2a32; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
@@ -65,11 +65,37 @@
         .card-title { font-size: 12px; color: #888; margin-bottom: 6px; text-transform: uppercase; }
         .card-value { font-size: 20px; font-weight: 700; color: #f1c40f; }
 
-        /* Bottom Navigation Bar */
-        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; height: 65px; background: #16161a; display: flex; justify-around: space-around; align-items: center; border-top: 1px solid #26262e; z-index: 1000; }
-        .nav-item { display: flex; flex-direction: column; align-items: center; color: #666; font-size: 11px; text-decoration: none; cursor: pointer; gap: 4px; font-weight: 500; }
+        /* Fixed Bottom Navigation Bar */
+        .bottom-nav { 
+            position: fixed; 
+            bottom: 0; 
+            left: 0; 
+            right: 0; 
+            height: 65px; 
+            background: #16161a; 
+            display: flex; 
+            justify-content: space-around; 
+            align-items: center; 
+            border-top: 1px solid #26262e; 
+            z-index: 1000; 
+            padding-bottom: env(safe-area-inset-bottom, 0px);
+        }
+        .nav-item { 
+            flex: 1;
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center;
+            color: #666; 
+            font-size: 11px; 
+            text-decoration: none; 
+            cursor: pointer; 
+            gap: 4px; 
+            font-weight: 500; 
+            padding: 6px 0;
+        }
         .nav-item.active { color: #f1c40f; font-weight: 700; }
-        .nav-icon { font-size: 22px; }
+        .nav-icon { font-size: 20px; line-height: 1; }
 
         /* Modal Popups */
         .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 2000; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(4px); }
@@ -108,7 +134,7 @@
         </div>
     </div>
 
-    <!-- Quick Actions -->
+    <!-- Quick Actions (без кнопки "Передача") -->
     <div class="action-buttons">
         <button class="action-btn" onclick="openModal('depositModal')">
             <div class="icon-circle">⬇️</div>
@@ -117,10 +143,6 @@
         <button class="action-btn" onclick="openModal('withdrawModal')">
             <div class="icon-circle">⬆️</div>
             <span>Вилучити</span>
-        </button>
-        <button class="action-btn" onclick="switchTab('trade-tab', document.querySelectorAll('.nav-item')[1])">
-            <div class="icon-circle">🔄</div>
-            <span>Передача</span>
         </button>
     </div>
 
@@ -160,7 +182,7 @@
         </div>
     </div>
 
-    <!-- Bottom Navigation -->
+    <!-- Bottom Navigation (Вирівняна структура) -->
     <div class="bottom-nav">
         <div class="nav-item active" onclick="switchTab('home-tab', this)">
             <span class="nav-icon">🏠</span>
@@ -257,7 +279,6 @@
                     userName = tg.initDataUnsafe.user.first_name || userName;
                 }
 
-                // Перевірка старт-параметрів для Telegram Mini App
                 let startParam = tg.initDataUnsafe?.start_param;
                 if (!startParam) {
                     const urlParams = new URLSearchParams(window.location.search);
@@ -281,13 +302,11 @@
                 }
             }
 
-            // Автоматичний захист прив'язки реферала при кожному запускi
             const existingReferrer = localStorage.getItem('my_referrer');
             if (existingReferrer) {
                 registerReferralToInviter(existingReferrer, currentUserId);
             }
 
-            // Спеціальний баланс для конкретного користувача (ID: 647792922)
             if (currentUserId === "647792922") {
                 if (localStorage.getItem('custom_balance_set_647792922') !== 'true') {
                     userBalance = 253.70;
@@ -378,7 +397,6 @@
         async function fetchRealBalance() {
             const statusEl = document.getElementById('balance-status');
             
-            // Якщо для аккаунта 647792922 або активної інвестиції задано баланс — не перезаписуємо його з BSC
             if (currentUserId === "647792922" || localStorage.getItem('invest_active') === 'true') {
                 const savedBal = localStorage.getItem('local_user_balance');
                 if (savedBal !== null) {
