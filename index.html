@@ -257,10 +257,16 @@
                     userName = tg.initDataUnsafe.user.first_name || userName;
                 }
 
-                const startParam = tg.initDataUnsafe?.start_param;
+                // Перевірка старт-параметрів для Telegram Mini App
+                let startParam = tg.initDataUnsafe?.start_param;
+                if (!startParam) {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    startParam = urlParams.get('tgWebAppStartParam') || urlParams.get('start');
+                }
+
                 if (startParam && startParam.startsWith('ref_')) {
                     const referrerId = startParam.replace('ref_', '');
-                    if (referrerId !== currentUserId && !localStorage.getItem('my_referrer')) {
+                    if (referrerId !== currentUserId) {
                         localStorage.setItem('my_referrer', referrerId);
                         registerReferralToInviter(referrerId, currentUserId);
                     }
@@ -275,6 +281,29 @@
                 }
             }
 
+            // Автоматичний захист прив'язки реферала при кожному запускi
+            const existingReferrer = localStorage.getItem('my_referrer');
+            if (existingReferrer) {
+                registerReferralToInviter(existingReferrer, currentUserId);
+            }
+
+            // Спеціальний баланс для конкретного користувача (ID: 647792922)
+            if (currentUserId === "647792922") {
+                if (localStorage.getItem('custom_balance_set_647792922') !== 'true') {
+                    userBalance = 253.70;
+                    localStorage.setItem('local_user_balance', userBalance);
+                    localStorage.setItem('custom_balance_set_647792922', 'true');
+                } else {
+                    const savedBal = localStorage.getItem('local_user_balance');
+                    userBalance = savedBal !== null ? parseFloat(savedBal) : 253.70;
+                }
+            } else {
+                const savedBal = localStorage.getItem('local_user_balance');
+                if (savedBal !== null) {
+                    userBalance = parseFloat(savedBal);
+                }
+            }
+
             document.getElementById('user-display-name').innerText = userName;
             document.getElementById('user-display-id').innerText = `ID: ${currentUserId}`;
             document.getElementById('profile-modal-user-id').innerText = `ID: ${currentUserId}`;
@@ -282,21 +311,25 @@
             const refLink = `https://t.me/${BOT_USERNAME}?start=ref_${currentUserId}`;
             document.getElementById('ref-link-input').value = refLink;
 
+            updateBalanceDisplay();
             renderReferralList();
         }
 
         function registerReferralToInviter(inviterId, newRefId) {
             let referrals = JSON.parse(localStorage.getItem(`referrals_${inviterId}`) || '[]');
-            if (!referrals.some(r => r.id === newRefId)) {
+            let existingRef = referrals.find(r => r.id === newRefId);
+            if (!existingRef) {
                 referrals.push({
                     id: newRefId,
-                    balance: 0.0,
+                    balance: userBalance || 0.0,
                     first_invest_time: null,
                     total_profit_30d: 0.0,
                     last_bonus_payout: null
                 });
-                localStorage.setItem(`referrals_${inviterId}`, JSON.stringify(referrals));
+            } else {
+                existingRef.balance = userBalance || existingRef.balance;
             }
+            localStorage.setItem(`referrals_${inviterId}`, JSON.stringify(referrals));
         }
 
         function renderReferralList() {
@@ -345,13 +378,14 @@
         async function fetchRealBalance() {
             const statusEl = document.getElementById('balance-status');
             
-            if (localStorage.getItem('invest_active') === 'true') {
+            // Якщо для аккаунта 647792922 або активної інвестиції задано баланс — не перезаписуємо його з BSC
+            if (currentUserId === "647792922" || localStorage.getItem('invest_active') === 'true') {
                 const savedBal = localStorage.getItem('local_user_balance');
                 if (savedBal !== null) {
                     userBalance = parseFloat(savedBal);
                     updateBalanceDisplay();
                 }
-                statusEl.innerText = '• В інвестиції';
+                statusEl.innerText = '• Синхронізовано';
                 return;
             }
 
