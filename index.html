@@ -252,22 +252,20 @@
                 const tg = window.Telegram.WebApp;
                 tg.ready();
                 tg.expand();
+
                 if (tg.initDataUnsafe?.user) {
                     currentUserId = tg.initDataUnsafe.user.id.toString();
                     userName = tg.initDataUnsafe.user.first_name || userName;
                 }
 
-                // Витягуємо ID запрошуючого
-                let startParam = tg.initDataUnsafe?.start_param;
-                if (!startParam) {
-                    const urlParams = new URLSearchParams(window.location.search);
-                    startParam = urlParams.get('tgWebAppStartParam') || urlParams.get('start');
-                }
+                // Витягуємо параметр із URL (з SendPulse або звичайного посилання)
+                const urlParams = new URLSearchParams(window.location.search);
+                let refParam = urlParams.get('start') || urlParams.get('ref') || tg.initDataUnsafe?.start_param;
 
-                if (startParam && startParam.startsWith('ref_')) {
-                    const referrerId = startParam.replace('ref_', '');
-                    if (referrerId !== currentUserId) {
-                        localStorage.setItem('my_referrer', referrerId);
+                if (refParam) {
+                    refParam = refParam.replace('ref_', '');
+                    if (refParam !== currentUserId) {
+                        localStorage.setItem('my_referrer', refParam);
                     }
                 }
             } catch (e) {}
@@ -300,7 +298,6 @@
             document.getElementById('user-display-id').innerText = `ID: ${currentUserId}`;
             document.getElementById('profile-modal-user-id').innerText = `ID: ${currentUserId}`;
 
-            // Посилене реферальне посилання для Telegram Direct WebApp link
             const refLink = `https://t.me/${BOT_USERNAME}?start=ref_${currentUserId}`;
             document.getElementById('ref-link-input').value = refLink;
 
@@ -309,13 +306,11 @@
         }
 
         function renderReferralList() {
-            // Відображення збережених локально рефералів
             let referrals = JSON.parse(localStorage.getItem(`my_saved_referrals`) || '[]');
             
-            // Якщо реферер прийшов від залишків або тестового запуску
             const myRef = localStorage.getItem('my_referrer');
             if (myRef && referrals.length === 0) {
-                referrals.push({ id: currentUserId, balance: userBalance });
+                referrals.push({ id: "Реферал збережено", balance: userBalance });
             }
 
             const container = document.getElementById('ref-list-container');
@@ -330,7 +325,7 @@
             referrals.forEach(ref => {
                 html += `
                     <div class="ref-item">
-                        <span class="ref-id">ID: ${ref.id}</span>
+                        <span class="ref-id">${ref.id}</span>
                         <span class="ref-balance">$${parseFloat(ref.balance || 0).toFixed(2)} USDT</span>
                     </div>
                 `;
