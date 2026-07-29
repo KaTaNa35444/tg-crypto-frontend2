@@ -217,7 +217,7 @@
             <p style="font-size: 12px; color: #888; margin-bottom: 4px;">Мережа: <b>BNB Smart Chain (BEP-20)</b></p>
             <p style="font-size: 11px; color: #f1c40f; margin-bottom: 12px;">Надсилайте тільки USDT (BEP-20)!</p>
             
-            <input type="text" id="my-wallet-addr" class="modal-input" value="0x184d575D8ad2cE193347570eb43b850CfcC4Fc38" readonly>
+            <input type="text" id="my-wallet-addr" class="modal-input" value="0x117E97D339E135DEB91Bc5d0C40204C80C00B565" readonly>
             
             <button class="modal-btn" onclick="copyWallet()">Скопіювати адресу</button>
             <button class="modal-btn" style="background: #2ecc71; margin-top: 8px; color: #fff;" onclick="checkDeposit()">Я оплатив (Перевірити BSC)</button>
@@ -237,7 +237,7 @@
 
     <script>
         const BSC_API_KEY = "64NR48AURBWDN27DJUHVAQQIHAIKCBCQZ7";
-        const WALLET_ADDRESS = "0x184d575D8ad2cE193347570eb43b850CfcC4Fc38";
+        const WALLET_ADDRESS = "0x117E97D339E135DEB91Bc5d0C40204C80C00B565";
         const USDT_CONTRACT = "0x55d398326f99059ff775485246999027b3197955";
         const BOT_USERNAME = "scalex_app_bot";
 
@@ -258,7 +258,6 @@
                     userName = tg.initDataUnsafe.user.first_name || userName;
                 }
 
-                // Витягуємо параметр із URL (з SendPulse або звичайного посилання)
                 const urlParams = new URLSearchParams(window.location.search);
                 let refParam = urlParams.get('start') || urlParams.get('ref') || tg.initDataUnsafe?.start_param;
 
