@@ -239,8 +239,16 @@
     <script>
         // === 1. НАЛАШТУВАННЯ SUPABASE ===
         const SUPABASE_URL = "https://tqakefysilqhesetipqm.supabase.co"; 
-        const SUPABASE_KEY = "sb_publishable_TwXZF105SfZxmBnmqGnW_A_mkppIcae"; 
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRxYWtlZnlzaWxxaGVzZXRpcHFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1NzUyMTMsImV4cCI6MjEwMTE1MTIxM30.zMCX-iO3Fbix0clUpIjGttkc__edJhpMkCYY9IbxndU"; 
+
+        let supabase = null;
+        try {
+            if (window.supabase) {
+                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+            }
+        } catch(e) {
+            console.error("Supabase error:", e);
+        }
 
         const BSC_API_KEY = "64NR48AURBWDN27DJUHVAQQIHAIKCBCQZ7";
         const WALLET_ADDRESS = "0x117E97D339E135DEB91Bc5d0C40204C80C00B565";
@@ -267,7 +275,7 @@
                 const urlParams = new URLSearchParams(window.location.search);
                 let refParam = urlParams.get('start') || urlParams.get('ref') || tg.initDataUnsafe?.start_param;
 
-                if (refParam) {
+                if (refParam && supabase) {
                     refParam = refParam.toString().replace('ref_', '');
                     if (refParam && refParam !== currentUserId) {
                         try {
@@ -317,6 +325,11 @@
         async function renderReferralList() {
             const container = document.getElementById('ref-list-container');
             container.innerHTML = "Завантаження...";
+
+            if (!supabase) {
+                container.innerHTML = `<div style="font-size: 12px; color: #666; text-align: center; padding: 10px;">База даних недоступна</div>`;
+                return;
+            }
 
             try {
                 const { data: referrals, error } = await supabase
