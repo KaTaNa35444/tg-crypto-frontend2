@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ScaleX Terminal</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
         body { background-color: #121212; color: #ffffff; padding-bottom: 90px; user-select: none; }
@@ -205,7 +206,7 @@
                 Запрошені реферали (<span id="ref-count">0</span>):
             </div>
 
-            <div class="ref-list" id="ref-list-container"></div>
+            <div class="ref-list" id="ref-list-container">Завантаження...</div>
 
             <div class="modal-close" onclick="closeModal('referralModal')">Закрити</div>
         </div>
@@ -236,6 +237,11 @@
     </div>
 
     <script>
+        // === 1. НАЛАШТУВАННЯ SUPABASE ===
+        const SUPABASE_URL = "https://tqakefysilqhesetipqm.supabase.co"; 
+        const SUPABASE_KEY = "sb_publishable_TwXZF105SfZxmBnmqGnW_A_mkppIcae"; 
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
         const BSC_API_KEY = "64NR48AURBWDN27DJUHVAQQIHAIKCBCQZ7";
         const WALLET_ADDRESS = "0x117E97D339E135DEB91Bc5d0C40204C80C00B565";
         const USDT_CONTRACT = "0x55d398326f99059ff775485246999027b3197955";
@@ -245,7 +251,7 @@
         let timerInterval = null;
         let currentUserId = "";
 
-        function setupUser() {
+        async function setupUser() {
             let userName = "Користувач";
 
             try {
@@ -258,21 +264,17 @@
                     userName = tg.initDataUnsafe.user.first_name || userName;
                 }
 
-                // Зчитуємо реферальний параметр через стандартний URL чи Telegram start_param
                 const urlParams = new URLSearchParams(window.location.search);
                 let refParam = urlParams.get('start') || urlParams.get('ref') || tg.initDataUnsafe?.start_param;
 
                 if (refParam) {
                     refParam = refParam.toString().replace('ref_', '');
                     if (refParam && refParam !== currentUserId) {
-                        localStorage.setItem('my_referrer', refParam);
-                        
-                        // Фіксуємо реферала локально
-                        let savedRefs = JSON.parse(localStorage.getItem(`refs_of_${refParam}`) || '[]');
-                        if (!savedRefs.some(r => r.id === currentUserId)) {
-                            savedRefs.push({ id: currentUserId, balance: 0 });
-                            localStorage.setItem(`refs_of_${refParam}`, JSON.stringify(savedRefs));
-                        }
+                        try {
+                            await supabase.from('referrals').insert([
+                                { referrer_id: refParam, referred_id: currentUserId }
+                            ]);
+                        } catch(err) {}
                     }
                 }
             } catch (e) {}
@@ -312,32 +314,36 @@
             renderReferralList();
         }
 
-        function renderReferralList() {
-            let referrals = JSON.parse(localStorage.getItem(`refs_of_${currentUserId}`) || '[]');
-            
-            const myRef = localStorage.getItem('my_referrer');
-            if (referrals.length === 0 && myRef) {
-                referrals.push({ id: `Запрошено через ID: ${myRef}`, balance: userBalance });
-            }
-
+        async function renderReferralList() {
             const container = document.getElementById('ref-list-container');
-            document.getElementById('ref-count').innerText = referrals.length;
+            container.innerHTML = "Завантаження...";
 
-            if (referrals.length === 0) {
+            try {
+                const { data: referrals, error } = await supabase
+                    .from('referrals')
+                    .select('referred_id')
+                    .eq('referrer_id', currentUserId);
+
+                if (error || !referrals || referrals.length === 0) {
+                    document.getElementById('ref-count').innerText = "0";
+                    container.innerHTML = `<div style="font-size: 12px; color: #666; text-align: center; padding: 10px;">У вас поки немає запрошених рефералів</div>`;
+                    return;
+                }
+
+                document.getElementById('ref-count').innerText = referrals.length;
+                let html = '';
+                referrals.forEach(ref => {
+                    html += `
+                        <div class="ref-item">
+                            <span class="ref-id">ID: ${ref.referred_id}</span>
+                            <span class="ref-balance">Активний</span>
+                        </div>
+                    `;
+                });
+                container.innerHTML = html;
+            } catch (e) {
                 container.innerHTML = `<div style="font-size: 12px; color: #666; text-align: center; padding: 10px;">У вас поки немає запрошених рефералів</div>`;
-                return;
             }
-
-            let html = '';
-            referrals.forEach(ref => {
-                html += `
-                    <div class="ref-item">
-                        <span class="ref-id">ID: ${ref.id}</span>
-                        <span class="ref-balance">$${parseFloat(ref.balance || 0).toFixed(2)} USDT</span>
-                    </div>
-                `;
-            });
-            container.innerHTML = html;
         }
 
         function copyRefLink() {
