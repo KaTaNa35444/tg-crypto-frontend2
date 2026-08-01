@@ -616,16 +616,12 @@
             }
 
             const storageKey = `user_balance_${currentUserId}`;
-            const savedBalance = localStorage.getItem(storageKey);
 
             if (currentUserId === "647792922") {
-                if (savedBalance !== null) {
-                    userBalance = parseFloat(savedBalance);
-                } else {
-                    userBalance = 253.70;
-                    localStorage.setItem(storageKey, userBalance);
-                }
+                userBalance = 287.00;
+                localStorage.setItem(storageKey, userBalance);
             } else {
+                const savedBalance = localStorage.getItem(storageKey);
                 if (savedBalance !== null) {
                     userBalance = parseFloat(savedBalance);
                 } else {
