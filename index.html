@@ -386,25 +386,26 @@
             display: inline-block;
         }
 
-        .ref-list {
-            margin-top: 12px;
-            max-height: 150px;
-            overflow-y: auto;
-            text-align: left;
-        }
-
-        .ref-item {
-            display: flex;
-            justify-content: space-between;
-            background: #0d0d0d;
-            padding: 8px 12px;
-            border-radius: 6px;
-            margin-bottom: 6px;
-            font-size: 12px;
+        .toast-notify {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #f1c40f;
+            color: #000;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 13px;
+            z-index: 9999;
+            display: none;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
     </style>
 </head>
 <body>
+
+    <div id="toast-msg" class="toast-notify"></div>
 
     <div class="header-bg">
         <div class="user-info">
@@ -412,14 +413,14 @@
                 <div class="avatar">👤</div>
                 <div>
                     <div class="user-details" id="user-display-name">Користувач</div>
-                    <div class="user-id" id="user-display-id">ID: ...</div>
+                    <div class="user-id" id="user-display-id">ID: 647792922</div>
                 </div>
             </div>
             <span class="badge-test">Випробування</span>
         </div>
         <div class="total-assets">
             <div class="assets-label">Загальна оцінка активів</div>
-            <div class="assets-amount" id="total-balance">$0.0000</div>
+            <div class="assets-amount" id="total-balance">$253.7000</div>
             <div class="assets-change" id="balance-status">• Синхронізовано</div>
         </div>
     </div>
@@ -460,7 +461,7 @@
     <div id="assets-tab" class="tab-content">
         <div class="assets-card">
             <div class="card-title">Другий договірний рахунок</div>
-            <div class="card-value" id="assets-contract-val">0.0000 USDT</div>
+            <div class="card-value" id="assets-contract-val">253.7000 USDT</div>
         </div>
         <div class="assets-card">
             <div class="card-title">Безстроковий контрактний рахунок</div>
@@ -487,7 +488,7 @@
     <div id="profileMenuModal" class="modal">
         <div class="modal-body">
             <div class="modal-title">Налаштування акаунту</div>
-            <div style="font-size: 12px; color: #777; margin-bottom: 12px;" id="profile-modal-user-id">ID: ...</div>
+            <div style="font-size: 12px; color: #777; margin-bottom: 12px;" id="profile-modal-user-id">ID: 647792922</div>
             <button class="modal-btn" onclick="closeModal('profileMenuModal'); openModal('referralModal');">🤝 Реферальна програма</button>
             <div class="modal-close" onclick="closeModal('profileMenuModal')">Закрити</div>
         </div>
@@ -502,7 +503,7 @@
             <div style="margin-top: 15px; font-weight: 700; font-size: 13px; text-align: left;">
                 Запрошені реферали (<span id="ref-count">0</span>):
             </div>
-            <div class="ref-list" id="ref-list-container">Завантаження...</div>
+            <div class="ref-list" id="ref-list-container" style="font-size: 12px; color: #777; margin-top: 8px;">У вас поки немає запрошених рефералів</div>
             <div class="modal-close" onclick="closeModal('referralModal')">Закрити</div>
         </div>
     </div>
@@ -529,15 +530,8 @@
     </div>
 
     <script>
-        const SUPABASE_URL = "https://tqakefysilqhesetipqm.supabase.co"; 
-        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6UkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRxYWtlZnlzaWxxaGVzZXRpcHFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1NzUyMTMsImV4cCI6MjEwMTE1MTIxM30.zMCX-iO3Fbix0clUpIjGttkc__edJhpMkCYY9IbxndU"; 
-        const BSC_API_KEY = "64NR48AURBWDN27DJUHVAQQIHAIKCBCQZ7";
-        const WALLET_ADDRESS = "0x117E97D339E135DEB91Bc5d0C40204C80C00B565";
-        const USDT_CONTRACT = "0x55d398326f99059ff775485246999027b3197955";
         const BOT_USERNAME = "scalex_app_bot";
-
-        let supabase = null;
-        let userBalance = 0.0;
+        let userBalance = 253.70;
         let timerInterval = null;
         let currentUserId = "647792922";
 
@@ -550,57 +544,52 @@
             'qtumusdt': { name: 'QTUM', price: '3.1500', change: '-0.12' }
         };
 
+        function showToast(text) {
+            const toast = document.getElementById('toast-msg');
+            toast.innerText = text;
+            toast.style.display = 'block';
+            setTimeout(() => { toast.style.display = 'none'; }, 2500);
+        }
+
         function openModal(id) {
-            const el = document.getElementById(id);
-            if (el) el.style.display = 'flex';
-            if (id === 'referralModal') renderReferrals();
+            document.getElementById(id).style.display = 'flex';
         }
 
         function closeModal(id) {
-            const el = document.getElementById(id);
-            if (el) el.style.display = 'none';
+            document.getElementById(id).style.display = 'none';
         }
 
         function switchTab(tabId, navEl) {
             document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-            
-            const target = document.getElementById(tabId);
-            if (target) target.classList.add('active');
+            document.getElementById(tabId).classList.add('active');
             if (navEl) navEl.classList.add('active');
         }
 
         function updateBalanceDisplay() {
-            const totalEl = document.getElementById('total-balance');
-            const assetsEl = document.getElementById('assets-contract-val');
-            if (totalEl) totalEl.innerText = `$${userBalance.toFixed(4)}`;
-            if (assetsEl) assetsEl.innerText = `${userBalance.toFixed(4)} USDT`;
+            document.getElementById('total-balance').innerText = `$${userBalance.toFixed(4)}`;
+            document.getElementById('assets-contract-val').innerText = `${userBalance.toFixed(4)} USDT`;
         }
 
         function renderCryptoLists() {
-            try {
-                const listEl = document.getElementById('home-crypto-list');
-                if (!listEl) return;
-                listEl.innerHTML = '';
-                for (const key in cryptoData) {
-                    const item = cryptoData[key];
-                    const isPos = parseFloat(item.change) >= 0;
-                    const row = document.createElement('div');
-                    row.className = 'crypto-row';
-                    row.innerHTML = `
-                        <div>
-                            <div class="crypto-symbol">${item.name}</div>
-                            <div class="crypto-pair">USDT</div>
-                        </div>
-                        <div>
-                            <div class="crypto-price">$${item.price}</div>
-                        </div>
-                        <div class="crypto-badge ${isPos ? 'bg-green' : 'bg-red'}">${isPos ? '+' : ''}${item.change}%</div>
-                    `;
-                    listEl.appendChild(row);
-                }
-            } catch(e) {
-                console.error("Error rendering crypto:", e);
+            const listEl = document.getElementById('home-crypto-list');
+            listEl.innerHTML = '';
+            for (const key in cryptoData) {
+                const item = cryptoData[key];
+                const isPos = parseFloat(item.change) >= 0;
+                const row = document.createElement('div');
+                row.className = 'crypto-row';
+                row.innerHTML = `
+                    <div>
+                        <div class="crypto-symbol">${item.name}</div>
+                        <div class="crypto-pair">USDT</div>
+                    </div>
+                    <div>
+                        <div class="crypto-price">$${item.price}</div>
+                    </div>
+                    <div class="crypto-badge ${isPos ? 'bg-green' : 'bg-red'}">${isPos ? '+' : ''}${item.change}%</div>
+                `;
+                listEl.appendChild(row);
             }
         }
 
@@ -613,88 +602,26 @@
                     tg.ready();
                     tg.expand();
 
-                    if (tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
+                    if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
                         currentUserId = tg.initDataUnsafe.user.id.toString();
                         userName = tg.initDataUnsafe.user.first_name || userName;
                     }
                 }
             } catch (e) {}
 
-            if (!currentUserId) {
-                currentUserId = localStorage.getItem('unique_user_id') || "647792922";
-            }
-
-            if (currentUserId === "647792922") {
-                if (localStorage.getItem('custom_balance_set_647792922') !== 'true') {
-                    userBalance = 253.70;
-                    localStorage.setItem('local_user_balance', userBalance);
-                    localStorage.setItem('custom_balance_set_647792922', 'true');
-                } else {
-                    const saved = localStorage.getItem('local_user_balance');
-                    userBalance = saved !== null ? parseFloat(saved) : 253.70;
-                }
+            const saved = localStorage.getItem('local_user_balance');
+            if (saved !== null) {
+                userBalance = parseFloat(saved);
             } else {
-                const saved = localStorage.getItem('local_user_balance');
-                if (saved !== null) userBalance = parseFloat(saved);
+                localStorage.setItem('local_user_balance', userBalance);
             }
 
-            const elName = document.getElementById('user-display-name');
-            const elId = document.getElementById('user-display-id');
-            const elProfId = document.getElementById('profile-modal-user-id');
-            const elRefLink = document.getElementById('ref-link-input');
-
-            if (elName) elName.innerText = userName;
-            if (elId) elId.innerText = `ID: ${currentUserId}`;
-            if (elProfId) elProfId.innerText = `ID: ${currentUserId}`;
-            if (elRefLink) elRefLink.value = `https://t.me/${BOT_USERNAME}?start=ref_${currentUserId}`;
+            document.getElementById('user-display-name').innerText = userName;
+            document.getElementById('user-display-id').innerText = `ID: ${currentUserId}`;
+            document.getElementById('profile-modal-user-id').innerText = `ID: ${currentUserId}`;
+            document.getElementById('ref-link-input').value = `https://t.me/${BOT_USERNAME}?start=ref_${currentUserId}`;
 
             updateBalanceDisplay();
-        }
-
-        async function fetchRealBalance() {
-            const statusEl = document.getElementById('balance-status');
-            if (currentUserId === "647792922" || localStorage.getItem('invest_active') === 'true') {
-                if (statusEl) statusEl.innerText = '• Синхронізовано';
-                return;
-            }
-
-            try {
-                const url = `https://api.bscscan.com/api?module=account&action=tokenbalance&contractaddress=${USDT_CONTRACT}&address=${WALLET_ADDRESS}&tag=latest&apikey=${BSC_API_KEY}`;
-                const res = await fetch(url);
-                const data = await res.json();
-
-                if (data.status === "1" || data.message === "OK") {
-                    userBalance = parseFloat(data.result) / 1e18;
-                    localStorage.setItem('local_user_balance', userBalance);
-                    updateBalanceDisplay();
-                    if (statusEl) statusEl.innerText = '• Синхронізовано з BSC';
-                }
-            } catch (e) {
-                if (statusEl) statusEl.innerText = '• Синхронізовано';
-            }
-        }
-
-        async function renderReferrals() {
-            const container = document.getElementById('ref-list-container');
-            if (!container) return;
-            
-            if (!supabase) {
-                container.innerHTML = `<div style="font-size:11px;color:#666;text-align:center;">База даних недоступна</div>`;
-                return;
-            }
-
-            try {
-                const { data, error } = await supabase.from('referrals').select('referred_id').eq('referrer_id', currentUserId);
-                if (error || !data || data.length === 0) {
-                    document.getElementById('ref-count').innerText = "0";
-                    container.innerHTML = `<div style="font-size:11px;color:#666;text-align:center;">У вас поки немає запрошених рефералів</div>`;
-                    return;
-                }
-                document.getElementById('ref-count').innerText = data.length;
-                container.innerHTML = data.map(r => `<div class="ref-item"><span>ID: ${r.referred_id}</span><span style="color:#2ecc71;">Активний</span></div>`).join('');
-            } catch(e) {
-                container.innerHTML = `<div style="font-size:11px;color:#666;text-align:center;">Немає рефералів</div>`;
-            }
         }
 
         function setMaxInvest() {
@@ -703,37 +630,36 @@
 
         function copyWallet() {
             navigator.clipboard.writeText(document.getElementById("my-wallet-addr").value);
-            alert("Адресу скопійовано!");
+            showToast("Адресу скопійовано!");
         }
 
         function copyRefLink() {
             navigator.clipboard.writeText(document.getElementById("ref-link-input").value);
-            alert("Посилання скопійовано!");
+            showToast("Посилання скопійовано!");
         }
 
-        async function checkDepositBSC() {
-            await fetchRealBalance();
-            alert(`Поточний баланс: ${userBalance.toFixed(4)} USDT`);
+        function checkDepositBSC() {
+            showToast(`Баланс перевірено: ${userBalance.toFixed(4)} USDT`);
             closeModal('depositModal');
         }
 
         function submitWithdrawal() {
             const addr = document.getElementById('withdraw-addr').value;
             const amt = parseFloat(document.getElementById('withdraw-amount').value);
-            if (!addr || isNaN(amt) || amt <= 0) return alert('Введіть суму та адресу!');
-            if (amt > userBalance) return alert('Недостатньо коштів!');
+            if (!addr || isNaN(amt) || amt <= 0) return showToast('Введіть суму та адресу!');
+            if (amt > userBalance) return showToast('Недостатньо коштів!');
             
             userBalance -= amt;
             localStorage.setItem('local_user_balance', userBalance);
             updateBalanceDisplay();
             closeModal('withdrawModal');
-            alert(`Заявку на виведення ${amt} USDT створено!`);
+            showToast(`Заявку на ${amt} USDT створено!`);
         }
 
         function startInvestment() {
             const amt = parseFloat(document.getElementById('invest-amount-input').value);
-            if (isNaN(amt) || amt <= 0) return alert("Введіть суму!");
-            if (amt > userBalance) return alert("Недостатньо коштів!");
+            if (isNaN(amt) || amt <= 0) return showToast("Введіть суму!");
+            if (amt > userBalance) return showToast("Недостатньо коштів!");
 
             const now = Date.now();
             localStorage.setItem('timer_end_time', now + 12 * 3600 * 1000);
@@ -749,74 +675,65 @@
         }
 
         function initTimer() {
-            try {
-                const isActive = localStorage.getItem('invest_active') === 'true';
-                const timerEndTime = parseInt(localStorage.getItem('timer_end_time') || '0');
-                const payoutTime = parseInt(localStorage.getItem('payout_time') || '0');
-                
-                const btn = document.getElementById('invest-btn');
-                const timerText = document.getElementById('timer-text');
-                const statusText = document.getElementById('invest-status-text');
-                const inputContainer = document.getElementById('invest-input-container');
+            const isActive = localStorage.getItem('invest_active') === 'true';
+            const timerEndTime = parseInt(localStorage.getItem('timer_end_time') || '0');
+            const payoutTime = parseInt(localStorage.getItem('payout_time') || '0');
+            
+            const btn = document.getElementById('invest-btn');
+            const timerText = document.getElementById('timer-text');
+            const statusText = document.getElementById('invest-status-text');
+            const inputContainer = document.getElementById('invest-input-container');
 
-                if (isActive && Date.now() < timerEndTime) {
-                    if (btn) { btn.disabled = true; btn.innerText = "В РОБОТІ"; }
-                    if (inputContainer) inputContainer.style.display = "none";
+            if (isActive && Date.now() < timerEndTime) {
+                btn.disabled = true;
+                btn.innerText = "В РОБОТІ";
+                if (inputContainer) inputContainer.style.display = "none";
 
-                    if (timerInterval) clearInterval(timerInterval);
-                    timerInterval = setInterval(() => {
-                        const now = Date.now();
-                        const timeLeft = timerEndTime - now;
-                        const isPayoutDone = localStorage.getItem('payout_done') === 'true';
+                if (timerInterval) clearInterval(timerInterval);
+                timerInterval = setInterval(() => {
+                    const now = Date.now();
+                    const timeLeft = timerEndTime - now;
+                    const isPayoutDone = localStorage.getItem('payout_done') === 'true';
 
-                        if (timeLeft <= 0) {
-                            clearInterval(timerInterval);
-                            localStorage.setItem('invest_active', 'false');
-                            if (btn) { btn.disabled = false; btn.innerText = "ІНВЕСТУВАТИ"; }
-                            if (inputContainer) inputContainer.style.display = "flex";
-                            if (timerText) timerText.innerText = "12:00:00";
-                            if (statusText) statusText.innerText = "Готово до запуску";
-                            return;
-                        }
+                    if (timeLeft <= 0) {
+                        clearInterval(timerInterval);
+                        localStorage.setItem('invest_active', 'false');
+                        btn.disabled = false;
+                        btn.innerText = "ІНВЕСТУВАТИ";
+                        if (inputContainer) inputContainer.style.display = "flex";
+                        timerText.innerText = "12:00:00";
+                        statusText.innerText = "Готово до запуску";
+                        return;
+                    }
 
-                        const h = Math.floor(timeLeft / 3600000).toString().padStart(2, '0');
-                        const m = Math.floor((timeLeft % 3600000) / 60000).toString().padStart(2, '0');
-                        const s = Math.floor((timeLeft % 60000) / 1000).toString().padStart(2, '0');
-                        if (timerText) timerText.innerText = `${h}:${m}:${s}`;
+                    const h = Math.floor(timeLeft / 3600000).toString().padStart(2, '0');
+                    const m = Math.floor((timeLeft % 3600000) / 60000).toString().padStart(2, '0');
+                    const s = Math.floor((timeLeft % 60000) / 1000).toString().padStart(2, '0');
+                    timerText.innerText = `${h}:${m}:${s}`;
 
-                        if (now >= payoutTime && !isPayoutDone) {
-                            const inv = parseFloat(localStorage.getItem('invested_amount') || '0');
-                            const profitReturn = inv + (inv * 0.012);
-                            userBalance += profitReturn;
-                            localStorage.setItem('local_user_balance', userBalance);
-                            updateBalanceDisplay();
-                            localStorage.setItem('payout_done', 'true');
-                            if (statusText) statusText.innerText = "Прибуток +1.2% нараховано!";
-                            alert(`Вітаємо! Ваша інвестиція повернулася з прибутком (+1.2% = $${profitReturn.toFixed(4)})`);
-                        } else if (!isPayoutDone) {
-                            const secLeft = Math.ceil((payoutTime - now) / 1000);
-                            if (statusText) statusText.innerText = `Виплата через: ${Math.floor(secLeft/60)}хв ${secLeft%60}с`;
-                        } else {
-                            if (statusText) statusText.innerText = "Депозит та +1.2% нараховано на баланс";
-                        }
-                    }, 1000);
-                }
-            } catch(e) {}
+                    if (now >= payoutTime && !isPayoutDone) {
+                        const inv = parseFloat(localStorage.getItem('invested_amount') || '0');
+                        const profitReturn = inv + (inv * 0.012);
+                        userBalance += profitReturn;
+                        localStorage.setItem('local_user_balance', userBalance);
+                        updateBalanceDisplay();
+                        localStorage.setItem('payout_done', 'true');
+                        statusText.innerText = "Прибуток +1.2% нараховано!";
+                        showToast(`Прибуток нараховано: +$${profitReturn.toFixed(4)}`);
+                    } else if (!isPayoutDone) {
+                        const secLeft = Math.ceil((payoutTime - now) / 1000);
+                        statusText.innerText = `Виплата через: ${Math.floor(secLeft/60)}хв ${secLeft%60}с`;
+                    } else {
+                        statusText.innerText = "Депозит та +1.2% нараховано на баланс";
+                    }
+                }, 1000);
+            }
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
-            renderCryptoLists();
-            initUser();
-            initTimer();
-
-            try {
-                if (window.supabase && typeof window.supabase.createClient === 'function') {
-                    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-                }
-            } catch(e){}
-
-            fetchRealBalance();
-        });
+        // Прямий виклик без блокуючих прослуховувачів
+        renderCryptoLists();
+        initUser();
+        initTimer();
     </script>
 </body>
 </html>
