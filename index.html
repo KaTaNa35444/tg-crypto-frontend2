@@ -258,13 +258,21 @@
                     userName = tg.initDataUnsafe.user.first_name || userName;
                 }
 
+                // Зчитуємо реферальний параметр через стандартний URL чи Telegram start_param
                 const urlParams = new URLSearchParams(window.location.search);
                 let refParam = urlParams.get('start') || urlParams.get('ref') || tg.initDataUnsafe?.start_param;
 
                 if (refParam) {
-                    refParam = refParam.replace('ref_', '');
-                    if (refParam !== currentUserId) {
+                    refParam = refParam.toString().replace('ref_', '');
+                    if (refParam && refParam !== currentUserId) {
                         localStorage.setItem('my_referrer', refParam);
+                        
+                        // Фіксуємо реферала локально
+                        let savedRefs = JSON.parse(localStorage.getItem(`refs_of_${refParam}`) || '[]');
+                        if (!savedRefs.some(r => r.id === currentUserId)) {
+                            savedRefs.push({ id: currentUserId, balance: 0 });
+                            localStorage.setItem(`refs_of_${refParam}`, JSON.stringify(savedRefs));
+                        }
                     }
                 }
             } catch (e) {}
@@ -305,11 +313,11 @@
         }
 
         function renderReferralList() {
-            let referrals = JSON.parse(localStorage.getItem(`my_saved_referrals`) || '[]');
+            let referrals = JSON.parse(localStorage.getItem(`refs_of_${currentUserId}`) || '[]');
             
             const myRef = localStorage.getItem('my_referrer');
-            if (myRef && referrals.length === 0) {
-                referrals.push({ id: "Реферал збережено", balance: userBalance });
+            if (referrals.length === 0 && myRef) {
+                referrals.push({ id: `Запрошено через ID: ${myRef}`, balance: userBalance });
             }
 
             const container = document.getElementById('ref-list-container');
@@ -324,7 +332,7 @@
             referrals.forEach(ref => {
                 html += `
                     <div class="ref-item">
-                        <span class="ref-id">${ref.id}</span>
+                        <span class="ref-id">ID: ${ref.id}</span>
                         <span class="ref-balance">$${parseFloat(ref.balance || 0).toFixed(2)} USDT</span>
                     </div>
                 `;
