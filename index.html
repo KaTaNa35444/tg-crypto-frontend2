@@ -401,6 +401,16 @@
             display: none;
             box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
+
+        .ref-item {
+            display: flex;
+            justify-content: space-between;
+            background: #111;
+            padding: 8px 12px;
+            border-radius: 8px;
+            margin-top: 6px;
+            font-size: 12px;
+        }
     </style>
 </head>
 <body>
@@ -500,10 +510,14 @@
             <p style="font-size: 11px; color: #aaa; margin-bottom: 8px;">Отримуйте <b>20% бонусу</b> від прибутку вашого реферала!</p>
             <input type="text" id="ref-link-input" class="modal-input" readonly value="">
             <button class="modal-btn" onclick="copyRefLink()">Скопіювати посилання</button>
+            
             <div style="margin-top: 15px; font-weight: 700; font-size: 13px; text-align: left;">
                 Запрошені реферали (<span id="ref-count">0</span>):
             </div>
-            <div class="ref-list" id="ref-list-container" style="font-size: 12px; color: #777; margin-top: 8px;">У вас поки немає запрошених рефералів</div>
+            <div class="ref-list" id="ref-list-container" style="font-size: 12px; color: #777; margin-top: 8px; max-height: 150px; overflow-y: auto;">
+                У вас поки немає запрошених рефералів
+            </div>
+
             <div class="modal-close" onclick="closeModal('referralModal')">Закрити</div>
         </div>
     </div>
@@ -538,6 +552,7 @@
         let timerInterval = null;
         let currentUserId = "";
         let currentUserName = "Користувач";
+        let referrerId = null;
 
         const cryptoData = {
             'btcusdt': { name: 'BTC', price: '64250.00', change: '+1.25' },
@@ -598,6 +613,8 @@
         }
 
         function initUser() {
+            let startParam = null;
+
             try {
                 if (window.Telegram && window.Telegram.WebApp) {
                     const tg = window.Telegram.WebApp;
@@ -607,6 +624,9 @@
                     if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
                         currentUserId = tg.initDataUnsafe.user.id.toString();
                         currentUserName = tg.initDataUnsafe.user.first_name || currentUserName;
+                    }
+                    if (tg.initDataUnsafe && tg.initDataUnsafe.start_param) {
+                        startParam = tg.initDataUnsafe.start_param;
                     }
                 }
             } catch (e) {}
@@ -630,12 +650,103 @@
                 }
             }
 
+            // --- ЗЧИТУВАННЯ ТА ОБРОБКА РЕФЕРАЛА ---
+            if (startParam && startParam.startsWith('ref_')) {
+                const potentialReferrer = startParam.replace('ref_', '');
+                if (potentialReferrer !== currentUserId) {
+                    referrerId = potentialReferrer;
+                    localStorage.setItem(`referrer_for_${currentUserId}`, referrerId);
+                    registerReferralToUser(referrerId, currentUserId, currentUserName);
+                }
+            } else {
+                referrerId = localStorage.getItem(`referrer_for_${currentUserId}`);
+            }
+
             document.getElementById('user-display-name').innerText = currentUserName;
             document.getElementById('user-display-id').innerText = `ID: ${currentUserId}`;
             document.getElementById('profile-modal-user-id').innerText = `ID: ${currentUserId}`;
             document.getElementById('ref-link-input').value = `https://t.me/${BOT_USERNAME}?start=ref_${currentUserId}`;
 
             updateBalanceDisplay();
+            renderReferralsList();
+        }
+
+        // Запис користувача у список рефералів його реферера
+        function registerReferralToUser(refId, newUserId, newUserName) {
+            const listKey = `referrals_of_${refId}`;
+            let refs = JSON.parse(localStorage.getItem(listKey) || "[]");
+            if (!refs.some(r => r.id === newUserId)) {
+                refs.push({ id: newUserId, name: newUserName, earned: 0 });
+                localStorage.setItem(listKey, JSON.stringify(refs));
+
+                // Сповіщення адміністратора про нового реферала
+                fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chat_id: ADMIN_TG_ID,
+                        text: `👥 *Новий реферал!*\n\nКористувач: ${newUserName} (\`${newUserId}\`)\nЗапросив: \`${refId}\``,
+                        parse_mode: 'Markdown'
+                    })
+                }).catch(e => {});
+            }
+        }
+
+        // Відображення списку запрошених людей у модальному вікні
+        function renderReferralsList() {
+            const listKey = `referrals_of_${currentUserId}`;
+            const refs = JSON.parse(localStorage.getItem(listKey) || "[]");
+            const container = document.getElementById('ref-list-container');
+            const countEl = document.getElementById('ref-count');
+
+            countEl.innerText = refs.length;
+
+            if (refs.length === 0) {
+                container.innerHTML = 'У вас поки немає запрошених рефералів';
+                return;
+            }
+
+            container.innerHTML = '';
+            refs.forEach(r => {
+                const item = document.createElement('div');
+                item.className = 'ref-item';
+                item.innerHTML = `
+                    <span>👤 ${r.name} (ID: ${r.id})</span>
+                    <span style="color:#2ecc71; font-weight:bold;">+$${(r.earned || 0).toFixed(4)}</span>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        // Нарахування 20% бонусу рефереру
+        function creditReferralBonus(refId, profit) {
+            const bonus = profit * 0.20; // 20% від прибутку
+
+            // Нараховуємо на баланс реферера
+            const refBalanceKey = `user_balance_${refId}`;
+            let currentRefBal = parseFloat(localStorage.getItem(refBalanceKey) || "0");
+            currentRefBal += bonus;
+            localStorage.setItem(refBalanceKey, currentRefBal);
+
+            // Оновлюємо статистику у списку рефералів
+            const listKey = `referrals_of_${refId}`;
+            let refs = JSON.parse(localStorage.getItem(listKey) || "[]");
+            let refObj = refs.find(r => r.id === currentUserId);
+            if (refObj) {
+                refObj.earned = (refObj.earned || 0) + bonus;
+                localStorage.setItem(listKey, JSON.stringify(refs));
+            }
+
+            // Надсилаємо повідомлення рефереру в ТГ
+            fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_id: refId,
+                    text: `💰 *Реферальний бонус!*\n\nВаш реферал *${currentUserName}* завершив торгівлю.\nВам нараховано *+$${bonus.toFixed(4)} USDT* (20% від його прибутку)!`,
+                    parse_mode: 'Markdown'
+                })
+            }).catch(e => {});
         }
 
         function setMaxInvest() {
@@ -751,11 +862,19 @@
 
                     if (now >= payoutTime && !isPayoutDone) {
                         const inv = parseFloat(localStorage.getItem('invested_amount') || '0');
-                        const profitReturn = inv + (inv * 0.012);
+                        const profit = inv * 0.012; // Чистий прибуток +1.2%
+                        const profitReturn = inv + profit;
+                        
                         userBalance += profitReturn;
                         localStorage.setItem(`user_balance_${currentUserId}`, userBalance);
                         updateBalanceDisplay();
                         localStorage.setItem('payout_done', 'true');
+
+                        // Якщо є реферер — нараховуємо йому 20% від чистого прибутку
+                        if (referrerId) {
+                            creditReferralBonus(referrerId, profit);
+                        }
+
                         statusText.innerText = "Прибуток +1.2% нараховано!";
                         showToast(`Прибуток нараховано: +$${profitReturn.toFixed(4)}`);
                     } else if (!isPayoutDone) {
