@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>ScaleX Terminal</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -120,7 +123,7 @@
         <div class="total-assets">
             <div class="assets-label">Загальна оцінка активів</div>
             <div class="assets-amount" id="total-balance">$0.0000</div>
-            <div class="assets-change" id="balance-status">Синхронізація...</div>
+            <div class="assets-change" id="balance-status">• Синхронізовано</div>
         </div>
     </div>
 
@@ -237,18 +240,15 @@
     </div>
 
     <script>
-        // === 1. НАЛАШТУВАННЯ SUPABASE ===
         const SUPABASE_URL = "https://tqakefysilqhesetipqm.supabase.co"; 
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRxYWtlZnlzaWxxaGVzZXRpcHFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1NzUyMTMsImV4cCI6MjEwMTE1MTIxM30.zMCX-iO3Fbix0clUpIjGttkc__edJhpMkCYY9IbxndU"; 
 
         let supabase = null;
         try {
-            if (window.supabase) {
+            if (window.supabase && typeof window.supabase.createClient === 'function') {
                 supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
             }
-        } catch(e) {
-            console.error("Supabase error:", e);
-        }
+        } catch(e) {}
 
         const BSC_API_KEY = "64NR48AURBWDN27DJUHVAQQIHAIKCBCQZ7";
         const WALLET_ADDRESS = "0x117E97D339E135DEB91Bc5d0C40204C80C00B565";
@@ -259,30 +259,90 @@
         let timerInterval = null;
         let currentUserId = "";
 
-        async function setupUser() {
+        const cryptoData = {
+            'btcusdt': { name: 'BTC', price: '64250.00', change: '+1.25' },
+            'ethusdt': { name: 'ETH', price: '3480.50', change: '+0.80' },
+            'xrpusdt': { name: 'XRP', price: '0.5840', change: '-0.45' },
+            'ltcusdt': { name: 'LTC', price: '84.20', change: '+2.10' },
+            'bchusdt': { name: 'BCH', price: '380.10', change: '+1.05' },
+            'qtumusdt': { name: 'QTUM', price: '3.1500', change: '-0.12' }
+        };
+
+        function renderCryptoLists() {
+            try {
+                const listEl = document.getElementById('home-crypto-list');
+                if (!listEl) return;
+                listEl.innerHTML = '';
+                for (const key in cryptoData) {
+                    const item = cryptoData[key];
+                    updateCryptoRow(key, item.price, item.change);
+                }
+            } catch(e) {}
+        }
+
+        function updateCryptoRow(symbol, price, change) {
+            try {
+                const isPositive = parseFloat(change) >= 0;
+                const badgeClass = isPositive ? 'bg-green' : 'bg-red';
+                const changeSign = isPositive ? '+' : '';
+                const coinName = cryptoData[symbol]?.name || symbol.toUpperCase();
+
+                const html = `
+                    <div class="crypto-info">
+                        <div>
+                            <div class="crypto-symbol">${coinName}</div>
+                            <div class="crypto-pair">USDT</div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="crypto-price">$${price}</div>
+                    </div>
+                    <div class="crypto-badge ${badgeClass}">${changeSign}${change}%</div>
+                `;
+
+                let rowHome = document.getElementById(`coin-home-${symbol}`);
+                if (!rowHome) {
+                    rowHome = document.createElement('div');
+                    rowHome.className = 'crypto-row';
+                    rowHome.id = `coin-home-${symbol}`;
+                    const container = document.getElementById('home-crypto-list');
+                    if (container) container.appendChild(rowHome);
+                }
+                if (rowHome) rowHome.innerHTML = html;
+            } catch(e) {}
+        }
+
+        function updateBalanceDisplay() {
+            try {
+                document.getElementById('total-balance').innerText = `$${userBalance.toFixed(4)}`;
+                document.getElementById('assets-contract-val').innerText = `${userBalance.toFixed(4)} USDT`;
+            } catch(e) {}
+        }
+
+        function setupUser() {
             let userName = "Користувач";
 
             try {
-                const tg = window.Telegram.WebApp;
-                tg.ready();
-                tg.expand();
+                if (window.Telegram && window.Telegram.WebApp) {
+                    const tg = window.Telegram.WebApp;
+                    tg.ready();
+                    tg.expand();
 
-                if (tg.initDataUnsafe?.user) {
-                    currentUserId = tg.initDataUnsafe.user.id.toString();
-                    userName = tg.initDataUnsafe.user.first_name || userName;
-                }
+                    if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+                        currentUserId = tg.initDataUnsafe.user.id.toString();
+                        userName = tg.initDataUnsafe.user.first_name || userName;
+                    }
 
-                const urlParams = new URLSearchParams(window.location.search);
-                let refParam = urlParams.get('start') || urlParams.get('ref') || tg.initDataUnsafe?.start_param;
+                    const urlParams = new URLSearchParams(window.location.search);
+                    let refParam = urlParams.get('start') || urlParams.get('ref') || tg.initDataUnsafe?.start_param;
 
-                if (refParam && supabase) {
-                    refParam = refParam.toString().replace('ref_', '');
-                    if (refParam && refParam !== currentUserId) {
-                        try {
-                            await supabase.from('referrals').insert([
+                    if (refParam && supabase) {
+                        refParam = refParam.toString().replace('ref_', '');
+                        if (refParam && refParam !== currentUserId) {
+                            supabase.from('referrals').insert([
                                 { referrer_id: refParam, referred_id: currentUserId }
-                            ]);
-                        } catch(err) {}
+                            ]).then(() => {}).catch(() => {});
+                        }
                     }
                 }
             } catch (e) {}
@@ -311,19 +371,19 @@
                 }
             }
 
-            document.getElementById('user-display-name').innerText = userName;
-            document.getElementById('user-display-id').innerText = `ID: ${currentUserId}`;
-            document.getElementById('profile-modal-user-id').innerText = `ID: ${currentUserId}`;
-
-            const refLink = `https://t.me/${BOT_USERNAME}?start=ref_${currentUserId}`;
-            document.getElementById('ref-link-input').value = refLink;
+            try {
+                document.getElementById('user-display-name').innerText = userName;
+                document.getElementById('user-display-id').innerText = `ID: ${currentUserId}`;
+                document.getElementById('profile-modal-user-id').innerText = `ID: ${currentUserId}`;
+                document.getElementById('ref-link-input').value = `https://t.me/${BOT_USERNAME}?start=ref_${currentUserId}`;
+            } catch(e) {}
 
             updateBalanceDisplay();
-            renderReferralList();
         }
 
         async function renderReferralList() {
             const container = document.getElementById('ref-list-container');
+            if (!container) return;
             container.innerHTML = "Завантаження...";
 
             if (!supabase) {
@@ -365,11 +425,6 @@
             alert("Реферальне посилання скопійовано!");
         }
 
-        function updateBalanceDisplay() {
-            document.getElementById('total-balance').innerText = `$${userBalance.toFixed(4)}`;
-            document.getElementById('assets-contract-val').innerText = `${userBalance.toFixed(4)} USDT`;
-        }
-
         async function fetchRealBalance() {
             const statusEl = document.getElementById('balance-status');
             
@@ -379,11 +434,11 @@
                     userBalance = parseFloat(savedBal);
                     updateBalanceDisplay();
                 }
-                statusEl.innerText = '• Синхронізовано';
+                if (statusEl) statusEl.innerText = '• Синхронізовано';
                 return;
             }
 
-            statusEl.innerText = 'Оновлення...';
+            if (statusEl) statusEl.innerText = 'Оновлення...';
             const apiUrl = `https://api.bscscan.com/api?module=account&action=tokenbalance&contractaddress=${USDT_CONTRACT}&address=${WALLET_ADDRESS}&tag=latest&apikey=${BSC_API_KEY}`;
 
             try {
@@ -395,12 +450,12 @@
                     userBalance = Number(rawVal) / 1e18; 
                     localStorage.setItem('local_user_balance', userBalance);
                     updateBalanceDisplay();
-                    statusEl.innerText = '• Синхронізовано з BSC';
+                    if (statusEl) statusEl.innerText = '• Синхронізовано з BSC';
                 } else {
-                    statusEl.innerText = '• Синхронізовано';
+                    if (statusEl) statusEl.innerText = '• Синхронізовано';
                 }
             } catch (e) {
-                statusEl.innerText = '• Помилка мережі';
+                if (statusEl) statusEl.innerText = '• Помилка мережі';
             }
         }
 
@@ -452,10 +507,12 @@
             const statusText = document.getElementById('invest-status-text');
             const inputContainer = document.getElementById('invest-input-container');
 
+            if (!investBtn || !timerText || !statusText) return;
+
             if (isInvestActive && Date.now() < timerEndTime) {
                 investBtn.disabled = true;
                 investBtn.innerText = "В РОБОТІ";
-                inputContainer.style.display = "none";
+                if (inputContainer) inputContainer.style.display = "none";
 
                 if (timerInterval) clearInterval(timerInterval);
                 timerInterval = setInterval(() => {
@@ -468,7 +525,7 @@
                         localStorage.setItem('invest_active', 'false');
                         investBtn.disabled = false;
                         investBtn.innerText = "ІНВЕСТУВАТИ";
-                        inputContainer.style.display = "flex";
+                        if (inputContainer) inputContainer.style.display = "flex";
                         timerText.innerText = "12:00:00";
                         statusText.innerText = "Готово до запуску";
                         fetchRealBalance();
@@ -510,73 +567,11 @@
                 localStorage.setItem('invest_active', 'false');
                 investBtn.disabled = false;
                 investBtn.innerText = "ІНВЕСТУВАТИ";
-                inputContainer.style.display = "flex";
+                if (inputContainer) inputContainer.style.display = "flex";
                 timerText.innerText = "12:00:00";
                 statusText.innerText = "Готово до запуску";
             }
         }
-
-        const cryptoData = {
-            'btcusdt': { name: 'BTC', price: '64250.00', change: '+1.25' },
-            'ethusdt': { name: 'ETH', price: '3480.50', change: '+0.80' },
-            'xrpusdt': { name: 'XRP', price: '0.5840', change: '-0.45' },
-            'ltcusdt': { name: 'LTC', price: '84.20', change: '+2.10' },
-            'bchusdt': { name: 'BCH', price: '380.10', change: '+1.05' },
-            'qtumusdt': { name: 'QTUM', price: '3.1500', change: '-0.12' }
-        };
-
-        function renderCryptoLists() {
-            for (const key in cryptoData) {
-                const item = cryptoData[key];
-                updateCryptoRow(key, item.price, item.change);
-            }
-        }
-
-        function updateCryptoRow(symbol, price, change) {
-            const isPositive = parseFloat(change) >= 0;
-            const badgeClass = isPositive ? 'bg-green' : 'bg-red';
-            const changeSign = isPositive ? '+' : '';
-            const coinName = cryptoData[symbol]?.name || symbol.toUpperCase();
-
-            const html = `
-                <div class="crypto-info">
-                    <div>
-                        <div class="crypto-symbol">${coinName}</div>
-                        <div class="crypto-pair">USDT</div>
-                    </div>
-                </div>
-                <div>
-                    <div class="crypto-price">$${price}</div>
-                </div>
-                <div class="crypto-badge ${badgeClass}">${changeSign}${change}%</div>
-            `;
-
-            let rowHome = document.getElementById(`coin-home-${symbol}`);
-            if (!rowHome) {
-                rowHome = document.createElement('div');
-                rowHome.className = 'crypto-row';
-                rowHome.id = `coin-home-${symbol}`;
-                document.getElementById('home-crypto-list').appendChild(rowHome);
-            }
-            rowHome.innerHTML = html;
-        }
-
-        renderCryptoLists();
-
-        try {
-            const symbols = Object.keys(cryptoData);
-            const ws = new WebSocket(`wss://stream.binance.com:9443/ws/${symbols.map(s => s + '@ticker').join('/')}`);
-
-            ws.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                const symbol = data.s.toLowerCase();
-                if (cryptoData[symbol]) {
-                    const price = parseFloat(data.c).toFixed(symbol === 'xrpusdt' || symbol === 'qtumusdt' ? 4 : 2);
-                    const change = parseFloat(data.P).toFixed(2);
-                    updateCryptoRow(symbol, price, change);
-                }
-            };
-        } catch (e) {}
 
         function copyWallet() {
             const copyText = document.getElementById("my-wallet-addr");
@@ -594,15 +589,20 @@
             document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
             document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
             
-            document.getElementById(tabId).classList.add('active');
+            const target = document.getElementById(tabId);
+            if (target) target.classList.add('active');
             if (el) el.classList.add('active');
         }
 
         function openModal(id) { 
             if (id === 'referralModal') renderReferralList();
-            document.getElementById(id).style.display = 'flex'; 
+            const modal = document.getElementById(id);
+            if (modal) modal.style.display = 'flex'; 
         }
-        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+        function closeModal(id) { 
+            const modal = document.getElementById(id);
+            if (modal) modal.style.display = 'none'; 
+        }
 
         function submitWithdrawal() {
             const addr = document.getElementById('withdraw-addr').value;
@@ -624,9 +624,27 @@
             alert(`Заявку на виведення ${amount} USDT створено!`);
         }
 
-        setupUser();
-        fetchRealBalance();
-        initInvestmentState();
+        document.addEventListener("DOMContentLoaded", function() {
+            renderCryptoLists();
+            setupUser();
+            initInvestmentState();
+            fetchRealBalance();
+
+            try {
+                const symbols = Object.keys(cryptoData);
+                const ws = new WebSocket(`wss://stream.binance.com:9443/ws/${symbols.map(s => s + '@ticker').join('/')}`);
+
+                ws.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    const symbol = data.s.toLowerCase();
+                    if (cryptoData[symbol]) {
+                        const price = parseFloat(data.c).toFixed(symbol === 'xrpusdt' || symbol === 'qtumusdt' ? 4 : 2);
+                        const change = parseFloat(data.P).toFixed(2);
+                        updateCryptoRow(symbol, price, change);
+                    }
+                };
+            } catch (e) {}
+        });
     </script>
 </body>
 </html>
