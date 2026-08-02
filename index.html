@@ -431,7 +431,7 @@
         <div class="total-assets">
             <div class="assets-label">Загальна оцінка активів</div>
             <div class="assets-amount" id="total-balance">$0.0000</div>
-            <div class="assets-change" id="balance-status">• Синхронізовано</div>
+            <div class="assets-change" id="balance-status">• Синхронізовано з Supabase</div>
         </div>
     </div>
 
@@ -544,15 +544,19 @@
     </div>
 
     <script>
+        // --- ІНТЕГРАЦІЯ SUPABASE ---
+        const SUPABASE_URL = "https://tqakefysilqhesetipqm.supabase.co";
+        const SUPABASE_KEY = "sb_publishable_TwXZF105SfZxmBnmqGnW_A_mkppIcae";
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
         const BOT_USERNAME = "scalex_app_bot";
         const ADMIN_TG_ID = "647792922";
         const TELEGRAM_BOT_TOKEN = "8810022390:AAEuylgTirTr7btR1DKTwCDgzoS1cEfEFEs";
 
         let userBalance = 0.0000;
         let timerInterval = null;
-        let currentUserId = "";
+        let currentUserId = "647792922";
         let currentUserName = "Користувач";
-        let referrerId = null;
 
         const cryptoData = {
             'btcusdt': { name: 'BTC', price: '64250.00', change: '+1.25' },
@@ -570,13 +574,8 @@
             setTimeout(() => { toast.style.display = 'none'; }, 2500);
         }
 
-        function openModal(id) {
-            document.getElementById(id).style.display = 'flex';
-        }
-
-        function closeModal(id) {
-            document.getElementById(id).style.display = 'none';
-        }
+        function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
         function switchTab(tabId, navEl) {
             document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
@@ -612,141 +611,113 @@
             }
         }
 
-        function initUser() {
-            let startParam = null;
-
+        // --- СИНХРОНІЗАЦІЯ З SUPABASE ---
+        async function syncUserWithSupabase() {
             try {
                 if (window.Telegram && window.Telegram.WebApp) {
                     const tg = window.Telegram.WebApp;
                     tg.ready();
                     tg.expand();
-
                     if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
                         currentUserId = tg.initDataUnsafe.user.id.toString();
                         currentUserName = tg.initDataUnsafe.user.first_name || currentUserName;
                     }
-                    if (tg.initDataUnsafe && tg.initDataUnsafe.start_param) {
-                        startParam = tg.initDataUnsafe.start_param;
-                    }
                 }
-            } catch (e) {}
 
-            if (!currentUserId) {
-                currentUserId = "647792922";
-            }
+                document.getElementById('user-display-name').innerText = currentUserName;
+                document.getElementById('user-display-id').innerText = `ID: ${currentUserId}`;
+                document.getElementById('profile-modal-user-id').innerText = `ID: ${currentUserId}`;
+                document.getElementById('ref-link-input').value = `https://t.me/${BOT_USERNAME}?start=ref_${currentUserId}`;
 
-            const storageKey = `user_balance_${currentUserId}`;
+                // Отримуємо дані про користувача з бази Supabase
+                let { data: userData, error } = await supabaseClient
+                    .from('users')
+                    .select('*')
+                    .eq('telegram_id', currentUserId)
+                    .single();
 
-            if (currentUserId === "647792922") {
-                userBalance = 287.00;
-                localStorage.setItem(storageKey, userBalance);
-            } else {
-                const savedBalance = localStorage.getItem(storageKey);
-                if (savedBalance !== null) {
-                    userBalance = parseFloat(savedBalance);
+                if (!userData) {
+                    // Якщо користувача ще немає у базі — створюємо рядок
+                    const initialBalance = (currentUserId === "647792922") ? 287.00 : 0.00;
+                    const { data: newUser } = await supabaseClient
+                        .from('users')
+                        .insert([{
+                            telegram_id: parseInt(currentUserId),
+                            first_name: currentUserName,
+                            balance: initialBalance
+                        }])
+                        .select()
+                        .single();
+                    userBalance = initialBalance;
                 } else {
-                    userBalance = 0.0000;
-                    localStorage.setItem(storageKey, userBalance);
+                    userBalance = parseFloat(userData.balance || 0);
                 }
+
+                updateBalanceDisplay();
+            } catch (err) {
+                console.error("Помилка синхронізації з Supabase:", err);
             }
-
-            // --- ЗЧИТУВАННЯ ТА ОБРОБКА РЕФЕРАЛА ---
-            if (startParam && startParam.startsWith('ref_')) {
-                const potentialReferrer = startParam.replace('ref_', '');
-                if (potentialReferrer !== currentUserId) {
-                    referrerId = potentialReferrer;
-                    localStorage.setItem(`referrer_for_${currentUserId}`, referrerId);
-                    registerReferralToUser(referrerId, currentUserId, currentUserName);
-                }
-            } else {
-                referrerId = localStorage.getItem(`referrer_for_${currentUserId}`);
-            }
-
-            document.getElementById('user-display-name').innerText = currentUserName;
-            document.getElementById('user-display-id').innerText = `ID: ${currentUserId}`;
-            document.getElementById('profile-modal-user-id').innerText = `ID: ${currentUserId}`;
-            document.getElementById('ref-link-input').value = `https://t.me/${BOT_USERNAME}?start=ref_${currentUserId}`;
-
-            updateBalanceDisplay();
-            renderReferralsList();
         }
 
-        // Запис користувача у список рефералів його реферера
-        function registerReferralToUser(refId, newUserId, newUserName) {
-            const listKey = `referrals_of_${refId}`;
-            let refs = JSON.parse(localStorage.getItem(listKey) || "[]");
-            if (!refs.some(r => r.id === newUserId)) {
-                refs.push({ id: newUserId, name: newUserName, earned: 0 });
-                localStorage.setItem(listKey, JSON.stringify(refs));
+        async function saveUserBalanceToSupabase(newBalance) {
+            userBalance = newBalance;
+            updateBalanceDisplay();
+            await supabaseClient
+                .from('users')
+                .update({ balance: newBalance })
+                .eq('telegram_id', currentUserId);
+        }
 
-                // Сповіщення адміністратора про нового реферала
+        async function submitWithdrawal() {
+            const addr = document.getElementById('withdraw-addr').value;
+            const amt = parseFloat(document.getElementById('withdraw-amount').value);
+            
+            if (!addr || isNaN(amt) || amt <= 0) return showToast('Введіть суму та адресу!');
+            if (amt > userBalance) return showToast('Недостатньо коштів!');
+
+            try {
+                // 1. Записуємо заявку в Supabase таблицю withdrawals
+                const { error: withdrawErr } = await supabaseClient
+                    .from('withdrawals')
+                    .insert([{
+                        telegram_id: parseInt(currentUserId),
+                        amount: amt,
+                        wallet_address: addr,
+                        status: 'pending'
+                    }]);
+
+                if (withdrawErr) {
+                    console.error(withdrawErr);
+                    return showToast('Помилка бази даних!');
+                }
+
+                // 2. Списуємо баланс у Supabase
+                const updatedBal = userBalance - amt;
+                await saveUserBalanceToSupabase(updatedBal);
+
+                closeModal('withdrawModal');
+                showToast(`Заявку на ${amt} USDT створено!`);
+
+                // 3. Відправляємо повідомлення в Telegram Адміну
+                const message = `📤 <b>НОВА ЗАЯВКА НА ВИВЕДЕННЯ!</b>\n\n` +
+                                `👤 <b>Користувач:</b> ${currentUserName} (ID: <code>${currentUserId}</code>)\n` +
+                                `💰 <b>Сума:</b> <b>${amt} USDT</b>\n` +
+                                `📫 <b>Адреса:</b> <code>${addr}</code>\n\n` +
+                                `🔗 <a href="https://bscscan.com/address/${addr}">Перевірити на BscScan</a>`;
+
                 fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         chat_id: ADMIN_TG_ID,
-                        text: `👥 *Новий реферал!*\n\nКористувач: ${newUserName} (\`${newUserId}\`)\nЗапросив: \`${refId}\``,
-                        parse_mode: 'Markdown'
+                        text: message,
+                        parse_mode: 'HTML'
                     })
-                }).catch(e => {});
+                });
+
+            } catch (e) {
+                console.error("Помилка при створенні виводу:", e);
             }
-        }
-
-        // Відображення списку запрошених людей у модальному вікні
-        function renderReferralsList() {
-            const listKey = `referrals_of_${currentUserId}`;
-            const refs = JSON.parse(localStorage.getItem(listKey) || "[]");
-            const container = document.getElementById('ref-list-container');
-            const countEl = document.getElementById('ref-count');
-
-            countEl.innerText = refs.length;
-
-            if (refs.length === 0) {
-                container.innerHTML = 'У вас поки немає запрошених рефералів';
-                return;
-            }
-
-            container.innerHTML = '';
-            refs.forEach(r => {
-                const item = document.createElement('div');
-                item.className = 'ref-item';
-                item.innerHTML = `
-                    <span>👤 ${r.name} (ID: ${r.id})</span>
-                    <span style="color:#2ecc71; font-weight:bold;">+$${(r.earned || 0).toFixed(4)}</span>
-                `;
-                container.appendChild(item);
-            });
-        }
-
-        // Нарахування 20% бонусу рефереру
-        function creditReferralBonus(refId, profit) {
-            const bonus = profit * 0.20; // 20% від прибутку
-
-            // Нараховуємо на баланс реферера
-            const refBalanceKey = `user_balance_${refId}`;
-            let currentRefBal = parseFloat(localStorage.getItem(refBalanceKey) || "0");
-            currentRefBal += bonus;
-            localStorage.setItem(refBalanceKey, currentRefBal);
-
-            // Оновлюємо статистику у списку рефералів
-            const listKey = `referrals_of_${refId}`;
-            let refs = JSON.parse(localStorage.getItem(listKey) || "[]");
-            let refObj = refs.find(r => r.id === currentUserId);
-            if (refObj) {
-                refObj.earned = (refObj.earned || 0) + bonus;
-                localStorage.setItem(listKey, JSON.stringify(refs));
-            }
-
-            // Надсилаємо повідомлення рефереру в ТГ
-            fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    chat_id: refId,
-                    text: `💰 *Реферальний бонус!*\n\nВаш реферал *${currentUserName}* завершив торгівлю.\nВам нараховано *+$${bonus.toFixed(4)} USDT* (20% від його прибутку)!`,
-                    parse_mode: 'Markdown'
-                })
-            }).catch(e => {});
         }
 
         function setMaxInvest() {
@@ -767,7 +738,7 @@
             showToast(`Запит відправлено! Очікуйте підтвердження.`);
             closeModal('depositModal');
 
-            const message = `📥 *Заявка на поповнення!*\n\n👤 *Користувач:* ${currentUserName}\n🆔 *ID:* \`${currentUserId}\`\n💼 *Мережа:* BEP-20 (BSC)\n🌐 *BscScan:* [Перевірити гаманець](https://bscscan.com/address/0x117E97D339E135DEB91Bc5d0C40204C80C00B565)`;
+            const message = `📥 <b>Заявка на поповнення!</b>\n\n👤 <b>Користувач:</b> ${currentUserName}\n🆔 <b>ID:</b> <code>${currentUserId}</code>\n💼 <b>Мережа:</b> BEP-20 (BSC)\n🌐 <a href="https://bscscan.com/address/0x117E97D339E135DEB91Bc5d0C40204C80C00B565">Перевірити гаманець на BscScan</a>`;
 
             fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
                 method: 'POST',
@@ -775,37 +746,12 @@
                 body: JSON.stringify({
                     chat_id: ADMIN_TG_ID,
                     text: message,
-                    parse_mode: 'Markdown'
+                    parse_mode: 'HTML'
                 })
-            }).catch(err => console.log('Помилка сповіщення:', err));
+            });
         }
 
-        function submitWithdrawal() {
-            const addr = document.getElementById('withdraw-addr').value;
-            const amt = parseFloat(document.getElementById('withdraw-amount').value);
-            if (!addr || isNaN(amt) || amt <= 0) return showToast('Введіть суму та адресу!');
-            if (amt > userBalance) return showToast('Недостатньо коштів!');
-            
-            userBalance -= amt;
-            localStorage.setItem(`user_balance_${currentUserId}`, userBalance);
-            updateBalanceDisplay();
-            closeModal('withdrawModal');
-            showToast(`Заявку на ${amt} USDT створено!`);
-
-            const message = `📤 *Заявка на виведення коштів!*\n\n👤 *Користувач:* ${currentUserName}\n🆔 *ID:* \`${currentUserId}\`\n💰 *Сума:* \`${amt} USDT\`\n📫 *Адреса:* \`${addr}\``;
-
-            fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    chat_id: ADMIN_TG_ID,
-                    text: message,
-                    parse_mode: 'Markdown'
-                })
-            }).catch(err => console.log('Помилка сповіщення:', err));
-        }
-
-        function startInvestment() {
+        async function startInvestment() {
             const amt = parseFloat(document.getElementById('invest-amount-input').value);
             if (isNaN(amt) || amt <= 0) return showToast("Введіть суму!");
             if (amt > userBalance) return showToast("Недостатньо коштів!");
@@ -817,9 +763,7 @@
             localStorage.setItem('invest_active', 'true');
             localStorage.setItem('payout_done', 'false');
 
-            userBalance -= amt;
-            localStorage.setItem(`user_balance_${currentUserId}`, userBalance);
-            updateBalanceDisplay();
+            await saveUserBalanceToSupabase(userBalance - amt);
             initTimer();
         }
 
@@ -839,7 +783,7 @@
                 if (inputContainer) inputContainer.style.display = "none";
 
                 if (timerInterval) clearInterval(timerInterval);
-                timerInterval = setInterval(() => {
+                timerInterval = setInterval(async () => {
                     const now = Date.now();
                     const timeLeft = timerEndTime - now;
                     const isPayoutDone = localStorage.getItem('payout_done') === 'true';
@@ -862,18 +806,11 @@
 
                     if (now >= payoutTime && !isPayoutDone) {
                         const inv = parseFloat(localStorage.getItem('invested_amount') || '0');
-                        const profit = inv * 0.012; // Чистий прибуток +1.2%
+                        const profit = inv * 0.012; 
                         const profitReturn = inv + profit;
                         
-                        userBalance += profitReturn;
-                        localStorage.setItem(`user_balance_${currentUserId}`, userBalance);
-                        updateBalanceDisplay();
                         localStorage.setItem('payout_done', 'true');
-
-                        // Якщо є реферер — нараховуємо йому 20% від чистого прибутку
-                        if (referrerId) {
-                            creditReferralBonus(referrerId, profit);
-                        }
+                        await saveUserBalanceToSupabase(userBalance + profitReturn);
 
                         statusText.innerText = "Прибуток +1.2% нараховано!";
                         showToast(`Прибуток нараховано: +$${profitReturn.toFixed(4)}`);
@@ -888,7 +825,7 @@
         }
 
         renderCryptoLists();
-        initUser();
+        syncUserWithSupabase();
         initTimer();
     </script>
 </body>
