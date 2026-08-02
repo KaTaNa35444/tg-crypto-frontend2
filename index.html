@@ -526,7 +526,6 @@
     </div>
 
     <script>
-        // --- ПРАВИЛЬНІ ДАНІ SUPABASE ТА TELEGRAM ---
         const SUPABASE_URL = "https://tqakefysilqhesetipqm.supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRxYWtlZnlzaWxxaGVzZXRpcHFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1NzUyMTMsImV4cCI6MjEwMTE1MTIxM30.zMCX-iO3Fbix0clUpIjGttkc__edJhpMkCYY9IbxndU";
         
@@ -594,7 +593,6 @@
             }
         }
 
-        // --- СИНХРОНІЗАЦІЯ З SUPABASE ---
         async function syncUserWithSupabase() {
             try {
                 if (window.Telegram && window.Telegram.WebApp) {
@@ -612,7 +610,7 @@
                 document.getElementById('profile-modal-user-id').innerText = `ID: ${currentUserId}`;
                 document.getElementById('ref-link-input').value = `https://t.me/${BOT_USERNAME}?start=ref_${currentUserId}`;
 
-                let { data: userData, error } = await supabaseClient
+                let { data: userData } = await supabaseClient
                     .from('users')
                     .select('*')
                     .eq('telegram_id', currentUserId)
@@ -620,7 +618,7 @@
 
                 if (!userData) {
                     const initialBalance = (currentUserId === 647792922) ? 287.00 : 0.00;
-                    const { data: newUser, error: insertErr } = await supabaseClient
+                    const { data: newUser } = await supabaseClient
                         .from('users')
                         .insert([{
                             telegram_id: currentUserId,
@@ -630,7 +628,7 @@
                         .select()
                         .single();
 
-                    if (!insertErr && newUser) {
+                    if (newUser) {
                         userBalance = parseFloat(newUser.balance);
                     } else {
                         userBalance = initialBalance;
@@ -641,7 +639,7 @@
 
                 updateBalanceDisplay();
             } catch (err) {
-                console.error("Помилка синхронізації з Supabase:", err);
+                console.error("Помилка синхронізації:", err);
             }
         }
 
@@ -654,7 +652,6 @@
                 .eq('telegram_id', currentUserId);
         }
 
-        // --- ВИВЕДЕННЯ КОШТІВ ---
         async function submitWithdrawal() {
             const addr = document.getElementById('withdraw-addr').value.trim();
             const amt = parseFloat(document.getElementById('withdraw-amount').value);
@@ -663,7 +660,6 @@
             if (amt > userBalance) return showToast('Недостатньо коштів!');
 
             try {
-                // 1. Запис у Supabase
                 const { error: withdrawErr } = await supabaseClient
                     .from('withdrawals')
                     .insert([{
@@ -674,18 +670,16 @@
                     }]);
 
                 if (withdrawErr) {
-                    console.error("Деталі помилки виводу:", withdrawErr);
+                    console.error("Помилка виводу:", withdrawErr);
                     return showToast('Помилка бази даних!');
                 }
 
-                // 2. Списання балансу
                 const updatedBal = userBalance - amt;
                 await saveUserBalanceToSupabase(updatedBal);
 
                 closeModal('withdrawModal');
                 showToast(`Заявку на ${amt} USDT створено!`);
 
-                // 3. Відправка сповіщення Адміну в Telegram
                 const message = `📤 <b>НОВА ЗАЯВКА НА ВИВЕДЕННЯ!</b>\n\n` +
                                 `👤 <b>Користувач:</b> ${currentUserName} (ID: <code>${currentUserId}</code>)\n` +
                                 `💰 <b>Сума:</b> <b>${amt} USDT</b>\n` +
