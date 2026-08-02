@@ -593,6 +593,7 @@
             }
         }
 
+        // ЗАВАНТАЖЕННЯ ДАНИХ З SUPABASE (КЛЮЧОВА ФУНКЦІЯ)
         async function syncUserWithSupabase() {
             try {
                 if (window.Telegram && window.Telegram.WebApp) {
@@ -610,14 +611,16 @@
                 document.getElementById('profile-modal-user-id').innerText = `ID: ${currentUserId}`;
                 document.getElementById('ref-link-input').value = `https://t.me/${BOT_USERNAME}?start=ref_${currentUserId}`;
 
-                let { data: userData } = await supabaseClient
+                // Беремо точний баланс з бази даних Supabase
+                let { data: userData, error } = await supabaseClient
                     .from('users')
                     .select('*')
                     .eq('telegram_id', currentUserId)
                     .maybeSingle();
 
                 if (!userData) {
-                    const initialBalance = (currentUserId === 647792922) ? 287.00 : 0.00;
+                    // Якщо користувача ще немає, створюємо з балансом 0 (або 302.56 для тесту)
+                    const initialBalance = 0.00;
                     const { data: newUser } = await supabaseClient
                         .from('users')
                         .insert([{
@@ -634,12 +637,13 @@
                         userBalance = initialBalance;
                     }
                 } else {
+                    // ПРИМУСОВО ВСТАНОВЛЮЄМО БАЛАНС З БАЗИ
                     userBalance = parseFloat(userData.balance || 0);
                 }
 
                 updateBalanceDisplay();
             } catch (err) {
-                console.error("Помилка синхронізації:", err);
+                console.error("Помилка синхронізації з Supabase:", err);
             }
         }
 
@@ -660,6 +664,7 @@
             if (amt > userBalance) return showToast('Недостатньо коштів!');
 
             try {
+                // 1. Створюємо заявку
                 const { error: withdrawErr } = await supabaseClient
                     .from('withdrawals')
                     .insert([{
@@ -675,6 +680,7 @@
                     return;
                 }
 
+                // 2. Списуємо баланс і ОДРАЗУ зберігаємо в Supabase
                 const updatedBal = userBalance - amt;
                 await saveUserBalanceToSupabase(updatedBal);
 
