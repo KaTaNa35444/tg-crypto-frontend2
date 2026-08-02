@@ -593,9 +593,11 @@
             }
         }
 
-        // ЗАВАНТАЖЕННЯ ДАНИХ З SUPABASE (КЛЮЧОВА ФУНКЦІЯ)
+        // 1. СИНХРОНІЗАЦІЯ З SUPABASE ТА ЗБЕРЕЖЕННЯ РЕФЕРАЛА
         async function syncUserWithSupabase() {
             try {
+                let referrerId = null;
+
                 if (window.Telegram && window.Telegram.WebApp) {
                     const tg = window.Telegram.WebApp;
                     tg.ready();
@@ -604,6 +606,15 @@
                         currentUserId = parseInt(tg.initDataUnsafe.user.id);
                         currentUserName = tg.initDataUnsafe.user.first_name || currentUserName;
                     }
+
+                    // Зчитуємо start_param (наприклад, "ref_647792922")
+                    const startParam = tg.initDataUnsafe.start_param;
+                    if (startParam && startParam.startsWith('ref_')) {
+                        const extractedId = parseInt(startParam.replace('ref_', ''));
+                        if (!isNaN(extractedId) && extractedId !== currentUserId) {
+                            referrerId = extractedId;
+                        }
+                    }
                 }
 
                 document.getElementById('user-display-name').innerText = currentUserName;
@@ -611,22 +622,21 @@
                 document.getElementById('profile-modal-user-id').innerText = `ID: ${currentUserId}`;
                 document.getElementById('ref-link-input').value = `https://t.me/${BOT_USERNAME}?start=ref_${currentUserId}`;
 
-                // Беремо точний баланс з бази даних Supabase
-                let { data: userData, error } = await supabaseClient
+                let { data: userData } = await supabaseClient
                     .from('users')
                     .select('*')
                     .eq('telegram_id', currentUserId)
                     .maybeSingle();
 
                 if (!userData) {
-                    // Якщо користувача ще немає, створюємо з балансом 0 (або 302.56 для тесту)
                     const initialBalance = 0.00;
                     const { data: newUser } = await supabaseClient
                         .from('users')
                         .insert([{
                             telegram_id: currentUserId,
                             first_name: currentUserName,
-                            balance: initialBalance
+                            balance: initialBalance,
+                            referred_by: referrerId
                         }])
                         .select()
                         .single();
@@ -637,13 +647,57 @@
                         userBalance = initialBalance;
                     }
                 } else {
-                    // ПРИМУСОВО ВСТАНОВЛЮЄМО БАЛАНС З БАЗИ
                     userBalance = parseFloat(userData.balance || 0);
                 }
 
                 updateBalanceDisplay();
             } catch (err) {
                 console.error("Помилка синхронізації з Supabase:", err);
+            }
+        }
+
+        // 2. НАРАХУВАННЯ 20% БОНУСУ РЕФЕРЕРУ
+        async function rewardReferrer(userProfit) {
+            if (!userProfit || userProfit <= 0) return;
+
+            try {
+                const { data: currentUser } = await supabaseClient
+                    .from('users')
+                    .select('referred_by')
+                    .eq('telegram_id', currentUserId)
+                    .maybeSingle();
+
+                if (currentUser && currentUser.referred_by) {
+                    const referrerId = currentUser.referred_by;
+                    const refBonus = parseFloat((userProfit * 0.20).toFixed(4)); // 20% від чистого прибутку
+
+                    const { data: refUser } = await supabaseClient
+                        .from('users')
+                        .select('balance')
+                        .eq('telegram_id', referrerId)
+                        .maybeSingle();
+
+                    if (refUser) {
+                        const newRefBalance = parseFloat((parseFloat(refUser.balance || 0) + refBonus).toFixed(4));
+
+                        await supabaseClient
+                            .from('users')
+                            .update({ balance: newRefBalance })
+                            .eq('telegram_id', referrerId);
+
+                        fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                chat_id: referrerId,
+                                text: `🎉 <b>Реферальний бонус!</b>\nВаш реферал завершив інвестиційне коло. Вам нараховано <b>+$${refBonus} USDT</b> (20%)!`,
+                                parse_mode: 'HTML'
+                            })
+                        }).catch(e => console.log("Помилка надсилання сповіщення:", e));
+                    }
+                }
+            } catch (e) {
+                console.error("Помилка нарахування реферальних коштів:", e);
             }
         }
 
@@ -664,7 +718,6 @@
             if (amt > userBalance) return showToast('Недостатньо коштів!');
 
             try {
-                // 1. Створюємо заявку
                 const { error: withdrawErr } = await supabaseClient
                     .from('withdrawals')
                     .insert([{
@@ -680,7 +733,6 @@
                     return;
                 }
 
-                // 2. Списуємо баланс і ОДРАЗУ зберігаємо в Supabase
                 const updatedBal = userBalance - amt;
                 await saveUserBalanceToSupabase(updatedBal);
 
@@ -795,13 +847,19 @@
 
                     if (now >= payoutTime && !isPayoutDone) {
                         const inv = parseFloat(localStorage.getItem('invested_amount') || '0');
-                        const profitReturn = inv + (inv * 0.012);
+                        const profitOnly = inv * 0.012; // Чистий прибуток (1.2%)
+                        const totalReturn = inv + profitOnly;
                         
                         localStorage.setItem('payout_done', 'true');
-                        await saveUserBalanceToSupabase(userBalance + profitReturn);
+                        
+                        // 1. Спочатку нараховуємо 20% прибутку тому, хто запросив
+                        await rewardReferrer(profitOnly);
+
+                        // 2. Зберігаємо новий баланс інвестора
+                        await saveUserBalanceToSupabase(userBalance + totalReturn);
 
                         statusText.innerText = "Прибуток +1.2% нараховано!";
-                        showToast(`Прибуток нараховано: +$${profitReturn.toFixed(4)}`);
+                        showToast(`Прибуток нараховано: +$${totalReturn.toFixed(4)}`);
                     } else if (!isPayoutDone) {
                         const secLeft = Math.ceil((payoutTime - now) / 1000);
                         statusText.innerText = `Виплата через: ${Math.floor(secLeft/60)}хв ${secLeft%60}с`;
