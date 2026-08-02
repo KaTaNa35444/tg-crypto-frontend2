@@ -401,16 +401,6 @@
             display: none;
             box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
-
-        .ref-item {
-            display: flex;
-            justify-content: space-between;
-            background: #111;
-            padding: 8px 12px;
-            border-radius: 8px;
-            margin-top: 6px;
-            font-size: 12px;
-        }
     </style>
 </head>
 <body>
@@ -510,14 +500,6 @@
             <p style="font-size: 11px; color: #aaa; margin-bottom: 8px;">Отримуйте <b>20% бонусу</b> від прибутку вашого реферала!</p>
             <input type="text" id="ref-link-input" class="modal-input" readonly value="">
             <button class="modal-btn" onclick="copyRefLink()">Скопіювати посилання</button>
-            
-            <div style="margin-top: 15px; font-weight: 700; font-size: 13px; text-align: left;">
-                Запрошені реферали (<span id="ref-count">0</span>):
-            </div>
-            <div class="ref-list" id="ref-list-container" style="font-size: 12px; color: #777; margin-top: 8px; max-height: 150px; overflow-y: auto;">
-                У вас поки немає запрошених рефералів
-            </div>
-
             <div class="modal-close" onclick="closeModal('referralModal')">Закрити</div>
         </div>
     </div>
@@ -544,9 +526,10 @@
     </div>
 
     <script>
-        // --- ІНТЕГРАЦІЯ SUPABASE ---
+        // --- ПРАВИЛЬНІ ДАНІ SUPABASE ТА TELEGRAM ---
         const SUPABASE_URL = "https://tqakefysilqhesetipqm.supabase.co";
-        const SUPABASE_KEY = "sb_publishable_TwXZF105SfZxmBnmqGnW_A_mkppIcae";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRxYWtlZnlzaWxxaGVzZXRpcHFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1NzUyMTMsImV4cCI6MjEwMTE1MTIxM30.zMCX-iO3Fbix0clUpIjGttkc__edJhpMkCYY9IbxndU";
+        
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         const BOT_USERNAME = "scalex_app_bot";
@@ -555,7 +538,7 @@
 
         let userBalance = 0.0000;
         let timerInterval = null;
-        let currentUserId = "647792922";
+        let currentUserId = 647792922;
         let currentUserName = "Користувач";
 
         const cryptoData = {
@@ -619,7 +602,7 @@
                     tg.ready();
                     tg.expand();
                     if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-                        currentUserId = tg.initDataUnsafe.user.id.toString();
+                        currentUserId = parseInt(tg.initDataUnsafe.user.id);
                         currentUserName = tg.initDataUnsafe.user.first_name || currentUserName;
                     }
                 }
@@ -629,26 +612,29 @@
                 document.getElementById('profile-modal-user-id').innerText = `ID: ${currentUserId}`;
                 document.getElementById('ref-link-input').value = `https://t.me/${BOT_USERNAME}?start=ref_${currentUserId}`;
 
-                // Отримуємо дані про користувача з бази Supabase
                 let { data: userData, error } = await supabaseClient
                     .from('users')
                     .select('*')
                     .eq('telegram_id', currentUserId)
-                    .single();
+                    .maybeSingle();
 
                 if (!userData) {
-                    // Якщо користувача ще немає у базі — створюємо рядок
-                    const initialBalance = (currentUserId === "647792922") ? 287.00 : 0.00;
-                    const { data: newUser } = await supabaseClient
+                    const initialBalance = (currentUserId === 647792922) ? 287.00 : 0.00;
+                    const { data: newUser, error: insertErr } = await supabaseClient
                         .from('users')
                         .insert([{
-                            telegram_id: parseInt(currentUserId),
+                            telegram_id: currentUserId,
                             first_name: currentUserName,
                             balance: initialBalance
                         }])
                         .select()
                         .single();
-                    userBalance = initialBalance;
+
+                    if (!insertErr && newUser) {
+                        userBalance = parseFloat(newUser.balance);
+                    } else {
+                        userBalance = initialBalance;
+                    }
                 } else {
                     userBalance = parseFloat(userData.balance || 0);
                 }
@@ -668,37 +654,38 @@
                 .eq('telegram_id', currentUserId);
         }
 
+        // --- ВИВЕДЕННЯ КОШТІВ ---
         async function submitWithdrawal() {
-            const addr = document.getElementById('withdraw-addr').value;
+            const addr = document.getElementById('withdraw-addr').value.trim();
             const amt = parseFloat(document.getElementById('withdraw-amount').value);
             
             if (!addr || isNaN(amt) || amt <= 0) return showToast('Введіть суму та адресу!');
             if (amt > userBalance) return showToast('Недостатньо коштів!');
 
             try {
-                // 1. Записуємо заявку в Supabase таблицю withdrawals
+                // 1. Запис у Supabase
                 const { error: withdrawErr } = await supabaseClient
                     .from('withdrawals')
                     .insert([{
-                        telegram_id: parseInt(currentUserId),
+                        telegram_id: currentUserId,
                         amount: amt,
                         wallet_address: addr,
                         status: 'pending'
                     }]);
 
                 if (withdrawErr) {
-                    console.error(withdrawErr);
+                    console.error("Деталі помилки виводу:", withdrawErr);
                     return showToast('Помилка бази даних!');
                 }
 
-                // 2. Списуємо баланс у Supabase
+                // 2. Списання балансу
                 const updatedBal = userBalance - amt;
                 await saveUserBalanceToSupabase(updatedBal);
 
                 closeModal('withdrawModal');
                 showToast(`Заявку на ${amt} USDT створено!`);
 
-                // 3. Відправляємо повідомлення в Telegram Адміну
+                // 3. Відправка сповіщення Адміну в Telegram
                 const message = `📤 <b>НОВА ЗАЯВКА НА ВИВЕДЕННЯ!</b>\n\n` +
                                 `👤 <b>Користувач:</b> ${currentUserName} (ID: <code>${currentUserId}</code>)\n` +
                                 `💰 <b>Сума:</b> <b>${amt} USDT</b>\n` +
@@ -717,6 +704,7 @@
 
             } catch (e) {
                 console.error("Помилка при створенні виводу:", e);
+                showToast('Сталася помилка!');
             }
         }
 
@@ -806,8 +794,7 @@
 
                     if (now >= payoutTime && !isPayoutDone) {
                         const inv = parseFloat(localStorage.getItem('invested_amount') || '0');
-                        const profit = inv * 0.012; 
-                        const profitReturn = inv + profit;
+                        const profitReturn = inv + (inv * 0.012);
                         
                         localStorage.setItem('payout_done', 'true');
                         await saveUserBalanceToSupabase(userBalance + profitReturn);
