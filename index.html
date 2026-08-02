@@ -671,7 +671,8 @@
 
                 if (withdrawErr) {
                     console.error("Помилка виводу:", withdrawErr);
-                    return showToast('Помилка бази даних!');
+                    alert("Помилка Supabase: " + withdrawErr.message + " | Code: " + withdrawErr.code);
+                    return;
                 }
 
                 const updatedBal = userBalance - amt;
@@ -698,7 +699,7 @@
 
             } catch (e) {
                 console.error("Помилка при створенні виводу:", e);
-                showToast('Сталася помилка!');
+                alert("Загальна помилка JS: " + e.message);
             }
         }
 
