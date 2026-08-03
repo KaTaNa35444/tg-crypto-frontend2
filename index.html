@@ -2,39 +2,959 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>ScaleX Mini App</title>
+    <!-- Telegram WebApp SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Supabase JS Client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- FontAwesome icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
     <style>
+        :root {
+            --bg-color: #0b0e11;
+            --card-bg: #1e2329;
+            --text-color: #eaecef;
+            --text-dim: #848e9c;
+            --accent-green: #0ecb81;
+            --accent-red: #f6465d;
+            --brand-yellow: #f0b90b;
+            --brand-yellow-hover: #d9a607;
+            --border-color: #2b313a;
+            --modal-bg: #181a20;
+        }
+
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             -webkit-tap-highlight-color: transparent;
         }
 
         body {
-            background-color: #0d0d0d;
-            color: #ffffff;
-            padding-bottom: 80px;
-            user-select: none;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            padding-bottom: 70px;
+            overflow-x: hidden;
+            font-size: 14px;
         }
 
-        .header-bg {
-            background: linear-gradient(180deg, #1c0505 0%, #0d0d0d 100%);
-            padding: 16px;
+        /* Header */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background-color: var(--card-bg);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
 
         .user-info {
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #f0b90b, #f39c12);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #000;
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .user-details .username {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .user-details .user-id {
+            font-size: 11px;
+            color: var(--text-dim);
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 15px;
+            font-size: 18px;
+            color: var(--text-dim);
+        }
+
+        .header-actions i {
+            cursor: pointer;
+        }
+
+        /* Tab content management */
+        .tab-content {
+            display: none;
+            padding: 15px;
+            animation: fadeIn 0.2s ease-in-out;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Balance Banner */
+        .balance-card {
+            background: linear-gradient(135deg, #1e2329 0%, #141518 100%);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .balance-card::after {
+            content: '';
+            position: absolute;
+            top: -30px;
+            right: -30px;
+            width: 100px;
+            height: 100px;
+            background: rgba(240, 185, 11, 0.05);
+            border-radius: 50%;
+        }
+
+        .balance-title {
+            font-size: 12px;
+            color: var(--text-dim);
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .balance-amount {
+            font-size: 28px;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 15px;
+        }
+
+        .balance-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 10px;
+            border-radius: 8px;
+            border: none;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background-color: var(--brand-yellow);
+            color: #000;
+        }
+
+        .btn-primary:active {
+            background-color: var(--brand-yellow-hover);
+        }
+
+        .btn-secondary {
+            background-color: #2b313a;
+            color: var(--text-color);
+        }
+
+        .btn-secondary:active {
+            background-color: #363d47;
+        }
+
+        /* Quick Stats / Arbitrage Card */
+        .arbitrage-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 15px;
             margin-bottom: 20px;
         }
 
-        .user-profile {
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .card-title {
+            font-weight: 600;
+            font-size: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .badge-live {
+            background-color: rgba(14, 203, 129, 0.15);
+            color: var(--accent-green);
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+
+        /* Investment Input Section */
+        .invest-box {
+            background: #141518;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 10px;
+        }
+
+        .invest-input-group {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 5px;
+        }
+
+        .invest-input-group input {
+            background: transparent;
+            border: none;
+            color: #fff;
+            font-size: 18px;
+            font-weight: bold;
+            width: 60%;
+            outline: none;
+        }
+
+        .max-btn {
+            color: var(--brand-yellow);
+            font-size: 12px;
+            cursor: pointer;
+            font-weight: bold;
+            padding: 4px 8px;
+            background: rgba(240, 185, 11, 0.1);
+            border-radius: 4px;
+        }
+
+        .timer-display {
+            font-size: 20px;
+            font-weight: bold;
+            color: var(--brand-yellow);
+            text-align: center;
+            margin: 10px 0;
+            font-family: monospace;
+        }
+
+        /* Crypto List */
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .crypto-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .crypto-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+        }
+
+        .crypto-symbol {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .crypto-pair {
+            font-size: 11px;
+            color: var(--text-dim);
+        }
+
+        .crypto-price {
+            font-weight: 600;
+            text-align: right;
+        }
+
+        .crypto-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            min-width: 65px;
+            text-align: center;
+        }
+
+        .bg-green {
+            background-color: rgba(14, 203, 129, 0.15);
+            color: var(--accent-green);
+        }
+
+        .bg-red {
+            background-color: rgba(246, 70, 93, 0.15);
+            color: var(--accent-red);
+        }
+
+        /* Bottom Navigation */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background-color: var(--card-bg);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            color: var(--text-dim);
+            font-size: 10px;
+            text-decoration: none;
+            cursor: pointer;
+            width: 20%;
+        }
+
+        .nav-item i {
+            font-size: 18px;
+        }
+
+        .nav-item.active {
+            color: var(--brand-yellow);
+        }
+
+        /* Modals */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.75);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal-content {
+            background-color: var(--modal-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            width: 100%;
+            max-width: 400px;
+            padding: 20px;
+            position: relative;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .close-modal {
+            font-size: 20px;
+            color: var(--text-dim);
+            cursor: pointer;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 12px;
+            color: var(--text-dim);
+            margin-bottom: 5px;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 10px;
+            background-color: #141518;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-color);
+            font-size: 14px;
+            outline: none;
+        }
+
+        .wallet-address-box {
+            background: #141518;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px dashed var(--border-color);
+            word-break: break-all;
+            font-family: monospace;
+            font-size: 12px;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: var(--brand-yellow);
+            color: #000;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 12px;
+            z-index: 3000;
+            display: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Toast Notification -->
+    <div id="toast-msg" class="toast">Повідомлення</div>
+
+    <!-- Header -->
+    <header>
+        <div class="user-info">
+            <div class="avatar" id="user-avatar"><i class="fa-solid fa-user"></i></div>
+            <div class="user-details">
+                <div class="username" id="user-display-name">Завантаження...</div>
+                <div class="user-id" id="user-display-id">ID: -------</div>
+            </div>
+        </div>
+        <div class="header-actions">
+            <i class="fa-solid fa-qrcode" onclick="openModal('depositModal')"></i>
+            <i class="fa-solid fa-user-gear" onclick="openModal('profileModal')"></i>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT AREA -->
+    <main>
+        <!-- TAB 1: HOME (ГОЛОВНА) -->
+        <div id="tab-home" class="tab-content active">
+            <!-- Balance Banner -->
+            <div class="balance-card">
+                <div class="balance-title">Загальний Баланс</div>
+                <div class="balance-amount" id="total-balance">$0.0000</div>
+                <div class="balance-actions">
+                    <button class="btn btn-primary" onclick="openModal('depositModal')">
+                        <i class="fa-solid fa-arrow-down"></i> Поповнити
+                    </button>
+                    <button class="btn btn-secondary" onclick="openModal('withdrawModal')">
+                        <i class="fa-solid fa-arrow-up"></i> Вивести
+                    </button>
+                </div>
+            </div>
+
+            <!-- Arbitrage Trading Box -->
+            <div class="arbitrage-card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fa-solid fa-bolt" style="color: var(--brand-yellow);"></i>
+                        Арбітражний Смарт-Контракт
+                    </div>
+                    <span class="badge-live">LIVE 1.5% / 24h</span>
+                </div>
+                
+                <p style="font-size: 12px; color: var(--text-dim); margin-bottom: 10px;">
+                    Запустіть автоматичний міжбіржовий арбітраж для отримання фіксованого прибутку.
+                </p>
+
+                <div class="invest-box">
+                    <div style="font-size: 11px; color: var(--text-dim);">Сума інвестиції (USDT)</div>
+                    <div class="invest-input-group">
+                        <input type="number" id="invest-amount-input" placeholder="0.00" step="1">
+                        <span class="max-btn" onclick="setMaxInvest()">MAX</span>
+                    </div>
+                </div>
+
+                <div id="active-timer-box" style="display: none; margin-top: 15px;">
+                    <div style="font-size: 12px; text-align: center; color: var(--text-dim);">До завершення контракту:</div>
+                    <div class="timer-display" id="contract-timer">24:00:00</div>
+                </div>
+
+                <button class="btn btn-primary" id="btn-start-invest" style="width: 100%; margin-top: 15px;" onclick="startInvestment()">
+                    Запустити Контракт
+                </button>
+            </div>
+
+            <!-- Market Crypto List -->
+            <div class="section-title">
+                <span>Рінок у реальному часі</span>
+                <i class="fa-solid fa-chart-line" style="color: var(--text-dim); font-size: 14px;"></i>
+            </div>
+            <div class="crypto-list" id="home-crypto-list">
+                <!-- Динамічний список -->
+            </div>
+        </div>
+
+        <!-- TAB 2: ARBITRAGE (СКАУТ/АРБІТРАЖ) -->
+        <div id="tab-arbitrage" class="tab-content">
+            <div class="section-title">
+                <span>Арбітражні Пул-Спреди</span>
+            </div>
+            <div class="crypto-list">
+                <div class="crypto-row">
+                    <div>
+                        <div class="crypto-symbol">Binance ➔ Bybit</div>
+                        <div class="crypto-pair">BTC/USDT</div>
+                    </div>
+                    <div class="crypto-badge bg-green">+0.42%</div>
+                </div>
+                <div class="crypto-row">
+                    <div>
+                        <div class="crypto-symbol">OKX ➔ MEXC</div>
+                        <div class="crypto-pair">ETH/USDT</div>
+                    </div>
+                    <div class="crypto-badge bg-green">+0.85%</div>
+                </div>
+                <div class="crypto-row">
+                    <div>
+                        <div class="crypto-symbol">Gate.io ➔ KuCoin</div>
+                        <div class="crypto-pair">SOL/USDT</div>
+                    </div>
+                    <div class="crypto-badge bg-green">+1.12%</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: ASSETS (АМУНІЦІЯ/АКТИВИ) -->
+        <div id="tab-assets" class="tab-content">
+            <div class="section-title">Мої Активи</div>
+            <div class="crypto-row" style="margin-bottom: 10px;">
+                <div>
+                    <div class="crypto-symbol">Tether USD</div>
+                    <div class="crypto-pair">USDT (BEP-20)</div>
+                </div>
+                <div>
+                    <div class="crypto-price" id="assets-contract-val">0.0000 USDT</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: FRIENDS (РЕФЕРАЛИ) -->
+        <div id="tab-friends" class="tab-content">
+            <div class="balance-card">
+                <div class="balance-title">Партнерська програма</div>
+                <div style="font-size: 13px; margin: 10px 0; color: var(--text-dim);">
+                    Запрошуйте друзів та отримуйте **5%** від кожного їхнього депозиту на свій баланс!
+                </div>
+                <div class="form-group">
+                    <input type="text" class="form-control" id="ref-link-input" readonly value="https://t.me/scalex_app_bot">
+                </div>
+                <button class="btn btn-primary" style="width: 100%;" onclick="copyRefLink()">
+                    <i class="fa-solid fa-copy"></i> Скопіювати посилання
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- BOTTOM NAVIGATION -->
+    <nav class="bottom-nav">
+        <div class="nav-item active" onclick="switchTab('tab-home', this)">
+            <i class="fa-solid fa-house"></i>
+            <span>Головна</span>
+        </div>
+        <div class="nav-item" onclick="switchTab('tab-arbitrage', this)">
+            <i class="fa-solid fa-arrows-rotate"></i>
+            <span>Арбітраж</span>
+        </div>
+        <div class="nav-item" onclick="switchTab('tab-assets', this)">
+            <i class="fa-solid fa-wallet"></i>
+            <span>Активи</span>
+        </div>
+        <div class="nav-item" onclick="switchTab('tab-friends', this)">
+            <i class="fa-solid fa-users"></i>
+            <span>Друзі</span>
+        </div>
+    </nav>
+
+    <!-- MODAL: DEPOSIT -->
+    <div class="modal" id="depositModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>Поповнення USDT (BSC BEP-20)</span>
+                <i class="fa-solid fa-xmark close-modal" onclick="closeModal('depositModal')"></i>
+            </div>
+            <p style="font-size: 11px; color: var(--text-dim); margin-bottom: 12px;">
+                Надішліть USDT тільки через мережу **BNB Smart Chain (BEP20)** на вказану адресу:
+            </p>
+            <div class="wallet-address-box">
+                <input type="text" id="my-wallet-addr" value="0x71C7656EC7ab88b098defB751B7401B5f6d8976F" readonly style="width:100%; background:none; border:none; color:#fff; text-align:center; outline:none;">
+            </div>
+            <button class="btn btn-secondary" style="width: 100%; margin-bottom: 10px;" onclick="copyWallet()">
+                <i class="fa-solid fa-copy"></i> Скопіювати Адресу
+            </button>
+            <button class="btn btn-primary" style="width: 100%;" onclick="checkDepositBSC()">
+                Я оплатив
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL: WITHDRAW -->
+    <div class="modal" id="withdrawModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>Виведення коштів</span>
+                <i class="fa-solid fa-xmark close-modal" onclick="closeModal('withdrawModal')"></i>
+            </div>
+            <div class="form-group">
+                <label>Адреса гаманця (BEP-20)</label>
+                <input type="text" id="withdraw-addr" class="form-control" placeholder="0x...">
+            </div>
+            <div class="form-group">
+                <label>Сума (USDT)</label>
+                <input type="number" id="withdraw-amount" class="form-control" placeholder="0.00">
+            </div>
+            <button class="btn btn-primary" style="width: 100%;" onclick="submitWithdrawal()">
+                Підтвердити вивід
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL: PROFILE -->
+    <div class="modal" id="profileModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>Профіль Користувача</span>
+                <i class="fa-solid fa-xmark close-modal" onclick="closeModal('profileModal')"></i>
+            </div>
+            <div style="text-align: center; margin-bottom: 15px;">
+                <div class="avatar" style="width: 60px; height: 60px; margin: 0 auto 10px; font-size: 24px;">
+                    <i class="fa-solid fa-user"></i>
+                </div>
+                <div id="profile-modal-user-id" style="font-size: 12px; color: var(--text-dim);">ID: -------</div>
+            </div>
+            <div class="crypto-row" style="margin-bottom: 10px;">
+                <span>Статус Акаунту</span>
+                <span class="crypto-badge bg-green">Верифіковано</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        const SUPABASE_URL = "https://tqakefysilqhesetipqm.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRxYWtlZnlzaWxxaGVzZXRpcHFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1NzUyMTMsImV4cCI6MjEwMTE1MTIxM30.zMCX-iO3Fbix0clUpIjGttkc__edJhpMkCYY9IbxndU";
+        
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        const BOT_USERNAME = "scalex_app_bot";
+
+        let userBalance = 0.0000;
+        let timerInterval = null;
+        let currentUserId = null;
+        let currentUserName = "Користувач";
+
+        const cryptoData = {
+            'btcusdt': { name: 'BTC', price: '64250.00', change: '+1.25' },
+            'ethusdt': { name: 'ETH', price: '3480.50', change: '+0.80' },
+            'xrpusdt': { name: 'XRP', price: '0.5840', change: '-0.45' },
+            'ltcusdt': { name: 'LTC', price: '84.20', change: '+2.10' },
+            'bchusdt': { name: 'BCH', price: '380.10', change: '+1.05' },
+            'qtumusdt': { name: 'QTUM', price: '3.1500', change: '-0.12' }
+        };
+
+        function showToast(text) {
+            const toast = document.getElementById('toast-msg');
+            toast.innerText = text;
+            toast.style.display = 'block';
+            setTimeout(() => { toast.style.display = 'none'; }, 2500);
+        }
+
+        function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+        function switchTab(tabId, navEl) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            if (navEl) navEl.classList.add('active');
+        }
+
+        function updateBalanceDisplay() {
+            document.getElementById('total-balance').innerText = `$${userBalance.toFixed(4)}`;
+            document.getElementById('assets-contract-val').innerText = `${userBalance.toFixed(4)} USDT`;
+        }
+
+        function renderCryptoLists() {
+            const listEl = document.getElementById('home-crypto-list');
+            if (!listEl) return;
+            listEl.innerHTML = '';
+            for (const key in cryptoData) {
+                const item = cryptoData[key];
+                const isPos = parseFloat(item.change) >= 0;
+                const row = document.createElement('div');
+                row.className = 'crypto-row';
+                row.innerHTML = `
+                    <div>
+                        <div class="crypto-symbol">${item.name}</div>
+                        <div class="crypto-pair">USDT</div>
+                    </div>
+                    <div>
+                        <div class="crypto-price">$${item.price}</div>
+                    </div>
+                    <div class="crypto-badge ${isPos ? 'bg-green' : 'bg-red'}">${isPos ? '+' : ''}${item.change}%</div>
+                `;
+                listEl.appendChild(row);
+            }
+        }
+
+        // СИНХРОНІЗАЦІЯ З SUPABASE ТА ВСТАНОВЛЕННЯ СПЕЦІАЛЬНОГО БАЛАНСУ
+        async function syncUserWithSupabase() {
+            try {
+                let referrerId = null;
+
+                if (window.Telegram && window.Telegram.WebApp) {
+                    const tg = window.Telegram.WebApp;
+                    tg.ready();
+                    tg.expand();
+                    if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+                        currentUserId = parseInt(tg.initDataUnsafe.user.id);
+                        currentUserName = tg.initDataUnsafe.user.first_name || "Користувач";
+                    }
+
+                    const startParam = tg.initDataUnsafe.start_param;
+                    if (startParam && startParam.startsWith('ref_')) {
+                        const extractedId = parseInt(startParam.replace('ref_', ''));
+                        if (!isNaN(extractedId) && extractedId !== currentUserId) {
+                            referrerId = extractedId;
+                        }
+                    }
+                }
+
+                // За замовчуванням при запускi поза Telegram
+                if (!currentUserId) {
+                    currentUserId = 647792922;
+                }
+
+                document.getElementById('user-display-name').innerText = currentUserName;
+                document.getElementById('user-display-id').innerText = `ID: ${currentUserId}`;
+                document.getElementById('profile-modal-user-id').innerText = `ID: ${currentUserId}`;
+                document.getElementById('ref-link-input').value = `https://t.me/${BOT_USERNAME}?start=ref_${currentUserId}`;
+
+                // Встановлення фіксованого балансу 302 USDT для вашого ID
+                if (currentUserId === 647792922) {
+                    userBalance = 302.0000;
+                } else {
+                    let { data: userData, error } = await supabaseClient
+                        .from('users')
+                        .select('*')
+                        .eq('telegram_id', currentUserId)
+                        .maybeSingle();
+
+                    if (!userData) {
+                        const { data: newUser, error: createErr } = await supabaseClient
+                            .from('users')
+                            .insert([{
+                                telegram_id: currentUserId,
+                                first_name: currentUserName,
+                                balance: 0.0000,
+                                referred_by: referrerId
+                            }])
+                            .select()
+                            .single();
+
+                        if (newUser) {
+                            userBalance = parseFloat(newUser.balance);
+                        }
+                    } else {
+                        userBalance = parseFloat(userData.balance || 0);
+                    }
+                }
+
+                updateBalanceDisplay();
+                checkExistingInvestment();
+            } catch (err) {
+                console.error("Помилка синхронізації з Supabase:", err);
+            }
+        }
+
+        // ЛОГІКА ІНВЕСТИЦІЙ ТА ТАЙМЕРА
+        function startInvestment() {
+            const amountInput = document.getElementById('invest-amount-input');
+            const amt = parseFloat(amountInput.value);
+
+            if (isNaN(amt) || amt <= 0) {
+                return showToast('Введіть коректну суму!');
+            }
+            if (amt > userBalance) {
+                return showToast('Недостатньо коштів!');
+            }
+
+            userBalance -= amt;
+            updateBalanceDisplay();
+
+            const durationMs = 24 * 60 * 60 * 1000; // 24 години
+            const endTime = Date.now() + durationMs;
+
+            localStorage.setItem('active_invest_end', endTime);
+            localStorage.setItem('active_invest_amt', amt);
+
+            initTimer(endTime, amt);
+            showToast('Контракт успішно запущено!');
+        }
+
+        function checkExistingInvestment() {
+            const savedEnd = localStorage.getItem('active_invest_end');
+            const savedAmt = localStorage.getItem('active_invest_amt');
+
+            if (savedEnd && savedAmt) {
+                const endTime = parseInt(savedEnd);
+                if (Date.now() < endTime) {
+                    initTimer(endTime, parseFloat(savedAmt));
+                } else {
+                    localStorage.removeItem('active_invest_end');
+                    localStorage.removeItem('active_invest_amt');
+                }
+            }
+        }
+
+        function initTimer(endTime, investAmt) {
+            document.getElementById('active-timer-box').style.display = 'block';
+            document.getElementById('btn-start-invest').disabled = true;
+            document.getElementById('btn-start-invest').innerText = 'Контракт активний';
+
+            if (timerInterval) clearInterval(timerInterval);
+
+            timerInterval = setInterval(() => {
+                const now = Date.now();
+                const diff = endTime - now;
+
+                if (diff <= 0) {
+                    clearInterval(timerInterval);
+                    document.getElementById('active-timer-box').style.display = 'none';
+                    document.getElementById('btn-start-invest').disabled = false;
+                    document.getElementById('btn-start-invest').innerText = 'Запустити Контракт';
+
+                    // Нарахування 1.5% прибутку
+                    const profit = investAmt * 1.015;
+                    userBalance += profit;
+                    updateBalanceDisplay();
+
+                    localStorage.removeItem('active_invest_end');
+                    localStorage.removeItem('active_invest_amt');
+
+                    showToast(`Контракт завершено! Отримано +${profit.toFixed(4)} USDT`);
+                } else {
+                    const hrs = Math.floor(diff / (1000 * 60 * 60));
+                    const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                    const secs = Math.floor((diff % (1000 * 60)) / 1000);
+
+                    document.getElementById('contract-timer').innerText = 
+                        `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+                }
+            }, 1000);
+        }
+
+        async function submitWithdrawal() {
+            const addr = document.getElementById('withdraw-addr').value.trim();
+            const amt = parseFloat(document.getElementById('withdraw-amount').value);
+            
+            if (!addr || isNaN(amt) || amt <= 0) return showToast('Введіть суму та адресу!');
+            if (amt > userBalance) return showToast('Недостатньо коштів!');
+
+            try {
+                const { error: withdrawErr } = await supabaseClient
+                    .from('withdrawals')
+                    .insert([{
+                        telegram_id: currentUserId,
+                        amount: amt,
+                        wallet_address: addr,
+                        status: 'pending'
+                    }]);
+
+                if (withdrawErr) {
+                    showToast("Помилка створення заявки!");
+                    return;
+                }
+
+                userBalance -= amt;
+                updateBalanceDisplay();
+                closeModal('withdrawModal');
+                showToast(`Заявку на ${amt} USDT створено!`);
+
+            } catch (e) {
+                console.error("Помилка при створенні виводу:", e);
+            }
+        }
+
+        function setMaxInvest() {
+            const input = document.getElementById('invest-amount-input');
+            if (input) {
+                input.value = userBalance > 0 ? userBalance.toFixed(4) : 0;
+            }
+        }
+
+        function copyWallet() {
+            const addr = document.getElementById("my-wallet-addr");
+            if (addr) {
+                navigator.clipboard.writeText(addr.value);
+                showToast("Адресу скопійовано!");
+            }
+        }
+
+        function copyRefLink() {
+            const refLink = document.getElementById("ref-link-input");
+            if (refLink) {
+                navigator.clipboard.writeText(refLink.value);
+                showToast("Посилання скопійовано!");
+            }
+        }
+
+        function checkDepositBSC() {
+            showToast(`Запит відправлено! Очікуйте підтвердження.`);
+            closeModal('depositModal');
+        }
+
+        // Ініціалізація
+        renderCryptoLists();
+        syncUserWithSupabase();
+    </script>
+</body>
+</html>        .user-profile {
             display: flex;
             align-items: center;
             gap: 10px;
