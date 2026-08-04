@@ -185,7 +185,7 @@
             background-color: #363d47;
         }
 
-        /* Quick Stats / Arbitrage Card */
+        /* Arbitrage Card */
         .arbitrage-card {
             background-color: var(--card-bg);
             border: 1px solid var(--border-color);
@@ -263,23 +263,23 @@
             font-family: monospace;
         }
 
-        /* Crypto List */
+        /* Crypto & Referral Lists */
         .section-title {
             font-size: 16px;
             font-weight: 600;
-            margin-bottom: 12px;
+            margin: 15px 0 12px 0;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
 
-        .crypto-list {
+        .crypto-list, .referral-list {
             display: flex;
             flex-direction: column;
             gap: 10px;
         }
 
-        .crypto-row {
+        .crypto-row, .ref-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -289,12 +289,12 @@
             border-radius: 8px;
         }
 
-        .crypto-symbol {
+        .crypto-symbol, .ref-name {
             font-weight: 600;
             font-size: 14px;
         }
 
-        .crypto-pair {
+        .crypto-pair, .ref-date {
             font-size: 11px;
             color: var(--text-dim);
         }
@@ -304,13 +304,15 @@
             text-align: right;
         }
 
-        .crypto-badge {
+        .crypto-badge, .verification-badge {
             padding: 4px 8px;
             border-radius: 4px;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: bold;
-            min-width: 65px;
             text-align: center;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
         }
 
         .bg-green {
@@ -381,6 +383,8 @@
             max-width: 400px;
             padding: 20px;
             position: relative;
+            max-height: 80vh;
+            overflow-y: auto;
         }
 
         .modal-header {
@@ -453,20 +457,22 @@
 <body>
 
     <!-- Toast Notification -->
-    <div id="toast-msg" class="toast">Повідомлення</div>
+    <div id="toast-msg" class="toast">Message</div>
 
     <!-- Header -->
     <header>
         <div class="user-info">
             <div class="avatar" id="user-avatar"><i class="fa-solid fa-user"></i></div>
             <div class="user-details">
-                <div class="username" id="user-display-name">Завантаження...</div>
+                <div class="username" id="user-display-name">Loading...</div>
                 <div class="user-id" id="user-display-id">ID: -------</div>
             </div>
         </div>
         <div class="header-actions">
-            <i class="fa-solid fa-qrcode" onclick="openModal('depositModal')"></i>
-            <i class="fa-solid fa-user-gear" onclick="openModal('profileModal')"></i>
+            <!-- Кнопка сповіщень рефералів -->
+            <i class="fa-solid fa-bell" title="Referral Income" onclick="openModal('refNotificationModal')"></i>
+            <i class="fa-solid fa-qrcode" title="Deposit" onclick="openModal('depositModal')"></i>
+            <i class="fa-solid fa-user-gear" title="Profile" onclick="openModal('profileModal')"></i>
         </div>
     </header>
 
@@ -488,22 +494,22 @@
                 </div>
             </div>
 
-            <!-- Arbitrage Trading Box -->
+            <!-- Smart Contract Box (Англійською мовою) -->
             <div class="arbitrage-card">
                 <div class="card-header">
                     <div class="card-title">
                         <i class="fa-solid fa-bolt" style="color: var(--brand-yellow);"></i>
-                        Арбітражний Смарт-Контракт
+                        Smart Contract Staking
                     </div>
-                    <span class="badge-live">LIVE 1.5% / 24h</span>
+                    <span class="badge-live">LIVE 1.2% / 12h</span>
                 </div>
                 
-                <p style="font-size: 12px; color: var(--text-dim); margin-bottom: 10px;">
-                    Запустіть автоматичний міжбіржовий арбітраж для отримання фіксованого прибутку.
+                <p style="font-size: 12px; color: var(--text-dim); margin-bottom: 10px; line-height: 1.4;">
+                    Earn <strong>1.2% every 12 hours</strong> on your total invested amount in the smart contract.
                 </p>
 
                 <div class="invest-box">
-                    <div style="font-size: 11px; color: var(--text-dim);">Сума інвестиції (USDT)</div>
+                    <div style="font-size: 11px; color: var(--text-dim);">Investment Amount (USDT)</div>
                     <div class="invest-input-group">
                         <input type="number" id="invest-amount-input" placeholder="0.00" step="1">
                         <span class="max-btn" onclick="setMaxInvest()">MAX</span>
@@ -511,12 +517,12 @@
                 </div>
 
                 <div id="active-timer-box" style="display: none; margin-top: 15px;">
-                    <div style="font-size: 12px; text-align: center; color: var(--text-dim);">До завершення контракту:</div>
-                    <div class="timer-display" id="contract-timer">24:00:00</div>
+                    <div style="font-size: 12px; text-align: center; color: var(--text-dim);">Next Claim in:</div>
+                    <div class="timer-display" id="contract-timer">12:00:00</div>
                 </div>
 
                 <button class="btn btn-primary" id="btn-start-invest" style="width: 100%; margin-top: 15px;" onclick="startInvestment()">
-                    Запустити Контракт
+                    Activate Contract (1.2% / 12h)
                 </button>
             </div>
 
@@ -525,12 +531,10 @@
                 <span>Рінок у реальному часі</span>
                 <i class="fa-solid fa-chart-line" style="color: var(--text-dim); font-size: 14px;"></i>
             </div>
-            <div class="crypto-list" id="home-crypto-list">
-                <!-- Динамічний список -->
-            </div>
+            <div class="crypto-list" id="home-crypto-list"></div>
         </div>
 
-        <!-- TAB 2: ARBITRAGE (СКАУТ/АРБІТРАЖ) -->
+        <!-- TAB 2: ARBITRAGE -->
         <div id="tab-arbitrage" class="tab-content">
             <div class="section-title">
                 <span>Арбітражні Пул-Спреди</span>
@@ -560,7 +564,7 @@
             </div>
         </div>
 
-        <!-- TAB 3: ASSETS (АМУНІЦІЯ/АКТИВИ) -->
+        <!-- TAB 3: ASSETS -->
         <div id="tab-assets" class="tab-content">
             <div class="section-title">Мої Активи</div>
             <div class="crypto-row" style="margin-bottom: 10px;">
@@ -574,12 +578,12 @@
             </div>
         </div>
 
-        <!-- TAB 4: FRIENDS (РЕФЕРАЛИ) -->
+        <!-- TAB 4: FRIENDS -->
         <div id="tab-friends" class="tab-content">
             <div class="balance-card">
                 <div class="balance-title">Партнерська програма</div>
-                <div style="font-size: 13px; margin: 10px 0; color: var(--text-dim);">
-                    Запрошуйте друзів та отримуйте **5%** від кожного їхнього депозиту на свій баланс!
+                <div style="font-size: 13px; margin: 10px 0; color: var(--text-dim); line-height: 1.4;">
+                    Отримуй 20% від наторгованого балансу реферала кожні 30 днів
                 </div>
                 <div class="form-group">
                     <input type="text" class="form-control" id="ref-link-input" readonly value="https://t.me/scalex_app_bot">
@@ -588,6 +592,13 @@
                     <i class="fa-solid fa-copy"></i> Скопіювати посилання
                 </button>
             </div>
+
+            <!-- Список приєднаних рефералів -->
+            <div class="section-title">
+                <span>Запрошені реферали</span>
+                <span id="ref-count-badge" style="font-size: 12px; color: var(--brand-yellow);">(0)</span>
+            </div>
+            <div class="referral-list" id="referrals-list"></div>
         </div>
     </main>
 
@@ -669,8 +680,21 @@
             </div>
             <div class="crypto-row" style="margin-bottom: 10px;">
                 <span>Статус Акаунту</span>
-                <span class="crypto-badge bg-green">Верифіковано</span>
+                <span class="verification-badge bg-green" id="profile-verification-status">
+                    <i class="fa-solid fa-circle-check"></i> Верифіковано
+                </span>
             </div>
+        </div>
+    </div>
+
+    <!-- MODAL: REFERRAL NOTIFICATIONS -->
+    <div class="modal" id="refNotificationModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span><i class="fa-solid fa-message"></i> Дохід рефералів (30 днів)</span>
+                <i class="fa-solid fa-xmark close-modal" onclick="closeModal('refNotificationModal')"></i>
+            </div>
+            <div id="ref-notification-list"></div>
         </div>
     </div>
 
@@ -680,13 +704,13 @@
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRxYWtlZnlzaWxxaGVzZXRpcHFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1NzUyMTMsImV4cCI6MjEwMTE1MTIxM30.zMCX-iO3Fbix0clUpIjGttkc__edJhpMkCYY9IbxndU";
         
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
         const BOT_USERNAME = "scalex_app_bot";
 
         let userBalance = 0.0000;
         let timerInterval = null;
         let currentUserId = null;
         let currentUserName = "Користувач";
+        let userReferrals = [];
 
         const cryptoData = {
             'btcusdt': { name: 'BTC', price: '64250.00', change: '+1.25' },
@@ -717,6 +741,15 @@
         function updateBalanceDisplay() {
             document.getElementById('total-balance').innerText = `$${userBalance.toFixed(4)}`;
             document.getElementById('assets-contract-val').innerText = `${userBalance.toFixed(4)} USDT`;
+
+            const statusEl = document.getElementById('profile-verification-status');
+            if (userBalance >= 200) {
+                statusEl.className = 'verification-badge bg-green';
+                statusEl.innerHTML = '<i class="fa-solid fa-circle-check"></i> Верифіковано';
+            } else {
+                statusEl.className = 'verification-badge bg-red';
+                statusEl.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> Не Верифіковано';
+            }
         }
 
         function renderCryptoLists() {
@@ -742,7 +775,6 @@
             }
         }
 
-        // СИНХРОНІЗАЦІЯ З SUPABASE ТА ВСТАНОВЛЕННЯ СПЕЦІАЛЬНОГО БАЛАНСУ
         async function syncUserWithSupabase() {
             try {
                 let referrerId = null;
@@ -765,7 +797,6 @@
                     }
                 }
 
-                // За замовчуванням при запускi поза Telegram
                 if (!currentUserId) {
                     currentUserId = 647792922;
                 }
@@ -775,7 +806,6 @@
                 document.getElementById('profile-modal-user-id').innerText = `ID: ${currentUserId}`;
                 document.getElementById('ref-link-input').value = `https://t.me/${BOT_USERNAME}?start=ref_${currentUserId}`;
 
-                // Встановлення фіксованого балансу 302 USDT для вашого ID
                 if (currentUserId === 647792922) {
                     userBalance = 302.0000;
                 } else {
@@ -792,7 +822,9 @@
                                 telegram_id: currentUserId,
                                 first_name: currentUserName,
                                 balance: 0.0000,
-                                referred_by: referrerId
+                                referred_by: referrerId,
+                                traded_profit: 0.0000,
+                                first_profit_at: null
                             }])
                             .select()
                             .single();
@@ -800,41 +832,144 @@
                         if (newUser) {
                             userBalance = parseFloat(newUser.balance);
                         }
+
+                        if (referrerId) {
+                            await supabaseClient.from('chat_events').insert([{
+                                message: `Приєднався реферат (${currentUserId})`,
+                                referrer_id: referrerId,
+                                created_at: new Date()
+                            }]);
+                        }
                     } else {
                         userBalance = parseFloat(userData.balance || 0);
                     }
                 }
 
                 updateBalanceDisplay();
+                await loadReferralsData();
+                await checkReferralPayouts();
                 checkExistingInvestment();
             } catch (err) {
                 console.error("Помилка синхронізації з Supabase:", err);
             }
         }
 
-        // ЛОГІКА ІНВЕСТИЦІЙ ТА ТАЙМЕРА
+        async function loadReferralsData() {
+            const listEl = document.getElementById('referrals-list');
+            const notifListEl = document.getElementById('ref-notification-list');
+            listEl.innerHTML = '';
+            notifListEl.innerHTML = '';
+
+            const { data: refs, error } = await supabaseClient
+                .from('users')
+                .select('*')
+                .eq('referred_by', currentUserId);
+
+            userReferrals = refs || [];
+            document.getElementById('ref-count-badge').innerText = `(${userReferrals.length})`;
+
+            if (userReferrals.length === 0) {
+                listEl.innerHTML = `<div style="color: var(--text-dim); text-align: center; padding: 15px;">У вас ще немає запрошених рефералів</div>`;
+                notifListEl.innerHTML = `<div style="color: var(--text-dim); text-align: center; padding: 15px;">Немає активних виплат за 30 днів</div>`;
+                return;
+            }
+
+            userReferrals.forEach(ref => {
+                const isVerified = parseFloat(ref.balance || 0) >= 200;
+                const statusBadge = isVerified 
+                    ? `<span class="verification-badge bg-green"><i class="fa-solid fa-circle-check"></i> Верифіковано</span>`
+                    : `<span class="verification-badge bg-red"><i class="fa-solid fa-circle-xmark"></i> Не Верифіковано</span>`;
+
+                const row = document.createElement('div');
+                row.className = 'ref-item';
+                row.innerHTML = `
+                    <div>
+                        <div class="ref-name">${ref.first_name || 'Реферал'} (ID: ${ref.telegram_id})</div>
+                        <div class="ref-date">Баланс: ${parseFloat(ref.balance || 0).toFixed(2)} USDT</div>
+                    </div>
+                    <div>${statusBadge}</div>
+                `;
+                listEl.appendChild(row);
+
+                const profit = parseFloat(ref.traded_profit || 0);
+                const projectedBonus = (profit * 0.20).toFixed(4);
+
+                const notifRow = document.createElement('div');
+                notifRow.className = 'ref-item';
+                notifRow.style.marginBottom = '8px';
+                notifRow.innerHTML = `
+                    <div>
+                        <div class="ref-name">ID: ${ref.telegram_id}</div>
+                        <div class="ref-date">Наторговано: ${profit.toFixed(2)} USDT</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="color: var(--accent-green); font-weight: bold;">+${projectedBonus} USDT</div>
+                        <div style="font-size: 10px; color: var(--text-dim);">Ваш прибуток (20%)</div>
+                    </div>
+                `;
+                notifListEl.appendChild(notifRow);
+            });
+        }
+
+        async function checkReferralPayouts() {
+            if (!userReferrals || userReferrals.length === 0) return;
+
+            const now = new Date();
+
+            for (let ref of userReferrals) {
+                if (ref.first_profit_at) {
+                    const firstProfitDate = new Date(ref.first_profit_at);
+                    const diffDays = Math.floor((now - firstProfitDate) / (1000 * 60 * 60 * 24));
+
+                    if (diffDays >= 30 && parseFloat(ref.traded_profit || 0) > 0) {
+                        const totalTraded = parseFloat(ref.traded_profit);
+                        const bonus = totalTraded * 0.20;
+
+                        userBalance += bonus;
+                        updateBalanceDisplay();
+
+                        await supabaseClient
+                            .from('users')
+                            .update({
+                                traded_profit: 0,
+                                first_profit_at: new Date()
+                            })
+                            .eq('telegram_id', ref.telegram_id);
+
+                        showToast(`Отримано 20% (${bonus.toFixed(2)} USDT) від реферала ${ref.telegram_id}!`);
+                    }
+                }
+            }
+        }
+
+        // ОНОВЛЕНИЙ СМАРАТ-КОНТРАКТ: 12 ГОДИН ТА 1.2% ПРИБУТКУ
         function startInvestment() {
+            if (userBalance < 200) {
+                return showToast('Balance below $200! Verification required to run contract.');
+            }
+
             const amountInput = document.getElementById('invest-amount-input');
             const amt = parseFloat(amountInput.value);
 
             if (isNaN(amt) || amt <= 0) {
-                return showToast('Введіть коректну суму!');
+                return showToast('Please enter a valid investment amount!');
             }
             if (amt > userBalance) {
-                return showToast('Недостатньо коштів!');
+                return showToast('Insufficient balance!');
             }
 
             userBalance -= amt;
             updateBalanceDisplay();
 
-            const durationMs = 24 * 60 * 60 * 1000; // 24 години
+            // ТАЙМЕР НА 12 ГОДИН (12 * 60 * 60 * 1000 мс)
+            const durationMs = 12 * 60 * 60 * 1000;
             const endTime = Date.now() + durationMs;
 
             localStorage.setItem('active_invest_end', endTime);
             localStorage.setItem('active_invest_amt', amt);
 
             initTimer(endTime, amt);
-            showToast('Контракт успішно запущено!');
+            showToast('Smart contract activated! Yield: 1.2% / 12h');
         }
 
         function checkExistingInvestment() {
@@ -855,11 +990,11 @@
         function initTimer(endTime, investAmt) {
             document.getElementById('active-timer-box').style.display = 'block';
             document.getElementById('btn-start-invest').disabled = true;
-            document.getElementById('btn-start-invest').innerText = 'Контракт активний';
+            document.getElementById('btn-start-invest').innerText = 'Contract Active (1.2% / 12h)';
 
             if (timerInterval) clearInterval(timerInterval);
 
-            timerInterval = setInterval(() => {
+            timerInterval = setInterval(async () => {
                 const now = Date.now();
                 const diff = endTime - now;
 
@@ -867,17 +1002,23 @@
                     clearInterval(timerInterval);
                     document.getElementById('active-timer-box').style.display = 'none';
                     document.getElementById('btn-start-invest').disabled = false;
-                    document.getElementById('btn-start-invest').innerText = 'Запустити Контракт';
+                    document.getElementById('btn-start-invest').innerText = 'Activate Contract (1.2% / 12h)';
 
-                    // Нарахування 1.5% прибутку
-                    const profit = investAmt * 1.015;
-                    userBalance += profit;
+                    // РОЗРАХУНОК 1.2% ПРИБУТКУ
+                    const profitAmount = investAmt * 0.012;
+                    const totalReturn = investAmt + profitAmount;
+                    userBalance += totalReturn;
                     updateBalanceDisplay();
+
+                    await supabaseClient.rpc('record_user_profit', {
+                        user_tg_id: currentUserId,
+                        profit_val: profitAmount
+                    }).catch(() => {});
 
                     localStorage.removeItem('active_invest_end');
                     localStorage.removeItem('active_invest_amt');
 
-                    showToast(`Контракт завершено! Отримано +${profit.toFixed(4)} USDT`);
+                    showToast(`Contract completed! Received +${totalReturn.toFixed(4)} USDT (1.2%)`);
                 } else {
                     const hrs = Math.floor(diff / (1000 * 60 * 60));
                     const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
