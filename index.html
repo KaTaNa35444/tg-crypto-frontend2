@@ -17,7 +17,6 @@
             --accent-green: #0ecb81;
             --accent-red: #f6465d;
             --brand-yellow: #f0b90b;
-            --brand-yellow-hover: #d9a607;
             --border-color: #2b313a;
             --modal-bg: #181a20;
         }
@@ -25,7 +24,6 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
         body { background-color: var(--bg-color); color: var(--text-color); padding-bottom: 80px; overflow-x: hidden; font-size: 14px; }
 
-        /* Фікс відступу для Telegram WebApp Top Safe Area */
         header { 
             display: flex; 
             justify-content: space-between; 
@@ -69,15 +67,13 @@
         .timer-display { font-size: 20px; font-weight: bold; color: var(--brand-yellow); text-align: center; margin: 10px 0; font-family: monospace; }
 
         .section-title { font-size: 16px; font-weight: 600; margin: 15px 0 12px 0; display: flex; justify-content: space-between; align-items: center; }
-        .crypto-list, .referral-list { display: flex; flex-direction: column; gap: 10px; }
+        .crypto-list { display: flex; flex-direction: column; gap: 10px; }
 
-        /* Виправлення сітки крипто-рядків */
         .crypto-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; padding: 12px; background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; }
-        .ref-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; }
-        .crypto-symbol, .ref-name { font-weight: 600; font-size: 14px; }
-        .crypto-pair, .ref-date { font-size: 11px; color: var(--text-dim); }
+        .crypto-symbol { font-weight: 600; font-size: 14px; }
+        .crypto-pair { font-size: 11px; color: var(--text-dim); }
         .crypto-price { font-weight: 600; text-align: right; font-size: 14px; }
-        .crypto-badge, .verification-badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; text-align: center; display: inline-flex; align-items: center; justify-content: center; min-width: 65px; }
+        .crypto-badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; text-align: center; display: inline-flex; align-items: center; justify-content: center; min-width: 65px; }
         .bg-green { background-color: rgba(14, 203, 129, 0.15); color: var(--accent-green); }
         .bg-red { background-color: rgba(246, 70, 93, 0.15); color: var(--accent-red); }
 
@@ -229,7 +225,7 @@
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         const BOT_USERNAME = "scalex_app_bot";
 
-        let userBalance = 200.0000;
+        let userBalance = parseFloat(localStorage.getItem('user_local_balance')) || 200.0000;
         let timerInterval = null;
         let currentUserId = 8382253914; 
         let currentUserName = "AdMin";
@@ -262,6 +258,7 @@
         function updateBalanceDisplay() {
             document.getElementById('total-balance').innerText = `$${userBalance.toFixed(4)}`;
             document.getElementById('assets-contract-val').innerText = `${userBalance.toFixed(4)} USDT`;
+            localStorage.setItem('user_local_balance', userBalance);
         }
 
         function renderCryptoLists() {
@@ -305,35 +302,17 @@
                 document.getElementById('profile-modal-user-id').innerText = `ID: ${currentUserId}`;
                 document.getElementById('ref-link-input').value = `https://t.me/${BOT_USERNAME}?start=ref_${currentUserId}`;
 
-                let { data: userData } = await supabaseClient
-                    .from('users')
-                    .select('*')
-                    .eq('telegram_id', currentUserId)
-                    .maybeSingle();
-
-                // Якщо це ви (тестовий ID), примусово оновлюємо баланс до 200 в БД
-                if (currentUserId === 8382253914) {
-                    userBalance = 200.0000;
-                    await supabaseClient.from('users').upsert([{
-                        telegram_id: currentUserId,
-                        first_name: currentUserName,
-                        balance: 200.0000
-                    }]);
-                } else if (!userData) {
-                    userBalance = 0.0000;
-                    await supabaseClient.from('users').insert([{
-                        telegram_id: currentUserId,
-                        first_name: currentUserName,
-                        balance: 0.0000
-                    }]);
-                } else {
-                    userBalance = parseFloat(userData.balance || 0);
-                }
+                // Використовуємо upsert замість розсічених методів
+                await supabaseClient.from('users').upsert({
+                    telegram_id: currentUserId,
+                    first_name: currentUserName,
+                    balance: userBalance
+                }, { onConflict: 'telegram_id' });
 
                 updateBalanceDisplay();
                 checkExistingInvestment();
             } catch (err) {
-                console.error("Помилка синхронізації:", err);
+                console.error("Синхронізація обмежена:", err);
             }
         }
 
@@ -351,17 +330,19 @@
 
             const newBalance = userBalance - amt;
 
-            const { error } = await supabaseClient
-                .from('users')
-                .update({ balance: newBalance })
-                .eq('telegram_id', currentUserId);
-
-            if (error) {
-                return showToast('Помилка бази даних!');
-            }
-
+            // Спочатку змінюємо стан локально
             userBalance = newBalance;
             updateBalanceDisplay();
+
+            // Потім синхронізуємо з БД
+            try {
+                await supabaseClient.from('users').upsert({
+                    telegram_id: currentUserId,
+                    balance: newBalance
+                }, { onConflict: 'telegram_id' });
+            } catch (e) {
+                console.warn("Не вдалося синхронізувати з DB, але локальний баланс збережено");
+            }
 
             const durationMs = 12 * 60 * 60 * 1000;
             const endTime = Date.now() + durationMs;
@@ -401,15 +382,15 @@
 
                     const profitAmount = investAmt * 0.012;
                     const totalReturn = investAmt + profitAmount;
-                    const updatedBalance = userBalance + totalReturn;
-
-                    await supabaseClient
-                        .from('users')
-                        .update({ balance: updatedBalance })
-                        .eq('telegram_id', currentUserId);
-
-                    userBalance = updatedBalance;
+                    userBalance = userBalance + totalReturn;
                     updateBalanceDisplay();
+
+                    try {
+                        await supabaseClient.from('users').upsert({
+                            telegram_id: currentUserId,
+                            balance: userBalance
+                        }, { onConflict: 'telegram_id' });
+                    } catch (e) {}
 
                     localStorage.removeItem(`active_invest_end_${currentUserId}`);
                     localStorage.removeItem(`active_invest_amt_${currentUserId}`);
@@ -436,26 +417,23 @@
                 return showToast('Некоректна сума!');
             }
 
-            const newBalance = userBalance - amt;
-
-            const { error: dbError } = await supabaseClient
-                .from('users')
-                .update({ balance: newBalance })
-                .eq('telegram_id', currentUserId);
-
-            if (dbError) {
-                return showToast('Помилка бази даних при виводі!');
-            }
-
-            await supabaseClient.from('withdrawals').insert([{
-                telegram_id: currentUserId,
-                amount: amt,
-                wallet_address: addr,
-                status: 'pending'
-            }]);
-
-            userBalance = newBalance;
+            userBalance = userBalance - amt;
             updateBalanceDisplay();
+
+            try {
+                await supabaseClient.from('users').upsert({
+                    telegram_id: currentUserId,
+                    balance: userBalance
+                }, { onConflict: 'telegram_id' });
+
+                await supabaseClient.from('withdrawals').insert([{
+                    telegram_id: currentUserId,
+                    amount: amt,
+                    wallet_address: addr,
+                    status: 'pending'
+                }]);
+            } catch (e) {}
+
             closeModal('withdrawModal');
             showToast(`Заявку створено. Баланс: ${userBalance.toFixed(2)} USDT`);
         }
