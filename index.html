@@ -469,7 +469,6 @@
             </div>
         </div>
         <div class="header-actions">
-            <!-- Кнопка сповіщень рефералів -->
             <i class="fa-solid fa-bell" title="Referral Income" onclick="openModal('refNotificationModal')"></i>
             <i class="fa-solid fa-qrcode" title="Deposit" onclick="openModal('depositModal')"></i>
             <i class="fa-solid fa-user-gear" title="Profile" onclick="openModal('profileModal')"></i>
@@ -478,7 +477,7 @@
 
     <!-- MAIN CONTENT AREA -->
     <main>
-        <!-- TAB 1: HOME (ГОЛОВНА) -->
+        <!-- TAB 1: HOME -->
         <div id="tab-home" class="tab-content active">
             <!-- Balance Banner -->
             <div class="balance-card">
@@ -593,7 +592,6 @@
                 </button>
             </div>
 
-            <!-- Список приєднаних рефералів -->
             <div class="section-title">
                 <span>Запрошені реферали</span>
                 <span id="ref-count-badge" style="font-size: 12px; color: var(--brand-yellow);">(0)</span>
@@ -656,7 +654,7 @@
                 <input type="text" id="withdraw-addr" class="form-control" placeholder="0x...">
             </div>
             <div class="form-group">
-                <label>Сума (USDT)</label>
+                <label>Сума (USDT, мін. 10)</label>
                 <input type="number" id="withdraw-amount" class="form-control" placeholder="0.00">
             </div>
             <button class="btn btn-primary" style="width: 100%;" onclick="submitWithdrawal()">
@@ -713,11 +711,11 @@
         let userReferrals = [];
 
         const cryptoData = {
-            'btcusdt': { name: 'BTC', price: '64250.00', change: '+1.25' },
-            'ethusdt': { name: 'ETH', price: '3480.50', change: '+0.80' },
+            'btcusdt': { name: 'BTC', price: '64250.00', change: '1.25' },
+            'ethusdt': { name: 'ETH', price: '3480.50', change: '0.80' },
             'xrpusdt': { name: 'XRP', price: '0.5840', change: '-0.45' },
-            'ltcusdt': { name: 'LTC', price: '84.20', change: '+2.10' },
-            'bchusdt': { name: 'BCH', price: '380.10', change: '+1.05' },
+            'ltcusdt': { name: 'LTC', price: '84.20', change: '2.10' },
+            'bchusdt': { name: 'BCH', price: '380.10', change: '1.05' },
             'qtumusdt': { name: 'QTUM', price: '3.1500', change: '-0.12' }
         };
 
@@ -809,42 +807,43 @@
                 document.getElementById('profile-modal-user-id').innerText = `ID: ${currentUserId}`;
                 document.getElementById('ref-link-input').value = `https://t.me/${BOT_USERNAME}?start=ref_${currentUserId}`;
 
-                if (currentUserId === 647792922) {
-                    userBalance = 302.0000;
-                } else {
-                    let { data: userData, error } = await supabaseClient
+                let { data: userData } = await supabaseClient
+                    .from('users')
+                    .select('*')
+                    .eq('telegram_id', currentUserId)
+                    .maybeSingle();
+
+                if (!userData) {
+                    const { data: newUser } = await supabaseClient
                         .from('users')
-                        .select('*')
-                        .eq('telegram_id', currentUserId)
-                        .maybeSingle();
+                        .insert([{
+                            telegram_id: currentUserId,
+                            first_name: currentUserName,
+                            balance: 0.0000,
+                            referred_by: referrerId,
+                            traded_profit: 0.0000,
+                            first_profit_at: new Date()
+                        }])
+                        .select()
+                        .single();
 
-                    if (!userData) {
-                        const { data: newUser, error: createErr } = await supabaseClient
+                    if (newUser) userBalance = parseFloat(newUser.balance || 0);
+
+                    if (referrerId) {
+                        await supabaseClient.from('chat_events').insert([{
+                            message: `Приєднався реферал (${currentUserId})`,
+                            referrer_id: referrerId,
+                            created_at: new Date()
+                        }]);
+                    }
+                } else {
+                    userBalance = parseFloat(userData.balance || 0);
+
+                    if (!userData.referred_by && referrerId) {
+                        await supabaseClient
                             .from('users')
-                            .insert([{
-                                telegram_id: currentUserId,
-                                first_name: currentUserName,
-                                balance: 0.0000,
-                                referred_by: referrerId,
-                                traded_profit: 0.0000,
-                                first_profit_at: null
-                            }])
-                            .select()
-                            .single();
-
-                        if (newUser) {
-                            userBalance = parseFloat(newUser.balance);
-                        }
-
-                        if (referrerId) {
-                            await supabaseClient.from('chat_events').insert([{
-                                message: `Приєднався реферал (${currentUserId})`,
-                                referrer_id: referrerId,
-                                created_at: new Date()
-                            }]);
-                        }
-                    } else {
-                        userBalance = parseFloat(userData.balance || 0);
+                            .update({ referred_by: referrerId })
+                            .eq('telegram_id', currentUserId);
                     }
                 }
 
@@ -860,12 +859,14 @@
         async function loadReferralsData() {
             const listEl = document.getElementById('referrals-list');
             const notifListEl = document.getElementById('ref-notification-list');
+            if (!listEl || !notifListEl) return;
+
             listEl.innerHTML = '';
             notifListEl.innerHTML = '';
 
-            const { data: refs, error } = await supabaseClient
+            const { data: refs } = await supabaseClient
                 .from('users')
-                .select('*')
+                .select('telegram_id, first_name, balance, traded_profit, first_profit_at')
                 .eq('referred_by', currentUserId);
 
             userReferrals = refs || [];
@@ -920,32 +921,35 @@
             const now = new Date();
 
             for (let ref of userReferrals) {
-                if (ref.first_profit_at) {
-                    const firstProfitDate = new Date(ref.first_profit_at);
-                    const diffDays = Math.floor((now - firstProfitDate) / (1000 * 60 * 60 * 24));
+                const firstProfitDate = ref.first_profit_at ? new Date(ref.first_profit_at) : now;
+                const diffDays = Math.floor((now - firstProfitDate) / (1000 * 60 * 60 * 24));
 
-                    if (diffDays >= 30 && parseFloat(ref.traded_profit || 0) > 0) {
-                        const totalTraded = parseFloat(ref.traded_profit);
-                        const bonus = totalTraded * 0.20;
+                if (diffDays >= 30 && parseFloat(ref.traded_profit || 0) > 0) {
+                    const totalTraded = parseFloat(ref.traded_profit);
+                    const bonus = totalTraded * 0.20;
 
-                        userBalance += bonus;
-                        updateBalanceDisplay();
+                    userBalance += bonus;
+                    updateBalanceDisplay();
 
-                        await supabaseClient
-                            .from('users')
-                            .update({
-                                traded_profit: 0,
-                                first_profit_at: new Date()
-                            })
-                            .eq('telegram_id', ref.telegram_id);
+                    await supabaseClient
+                        .from('users')
+                        .update({ balance: userBalance })
+                        .eq('telegram_id', currentUserId);
 
-                        showToast(`Отримано 20% (${bonus.toFixed(2)} USDT) від реферала ${ref.telegram_id}!`);
-                    }
+                    await supabaseClient
+                        .from('users')
+                        .update({
+                            traded_profit: 0,
+                            first_profit_at: new Date()
+                        })
+                        .eq('telegram_id', ref.telegram_id);
+
+                    showToast(`Отримано 20% (${bonus.toFixed(2)} USDT) від реферала ${ref.telegram_id}!`);
                 }
             }
         }
 
-        function startInvestment() {
+        async function startInvestment() {
             if (userBalance < 200) {
                 return showToast('Balance below $200! Verification required to run contract.');
             }
@@ -961,29 +965,40 @@
             }
 
             userBalance -= amt;
+            
+            const { error } = await supabaseClient
+                .from('users')
+                .update({ balance: userBalance })
+                .eq('telegram_id', currentUserId);
+
+            if (error) {
+                userBalance += amt;
+                return showToast('Database error. Try again!');
+            }
+
             updateBalanceDisplay();
 
             const durationMs = 12 * 60 * 60 * 1000;
             const endTime = Date.now() + durationMs;
 
-            localStorage.setItem('active_invest_end', endTime);
-            localStorage.setItem('active_invest_amt', amt);
+            localStorage.setItem(`active_invest_end_${currentUserId}`, endTime);
+            localStorage.setItem(`active_invest_amt_${currentUserId}`, amt);
 
             initTimer(endTime, amt);
             showToast('Smart contract activated! Yield: 1.2% / 12h');
         }
 
         function checkExistingInvestment() {
-            const savedEnd = localStorage.getItem('active_invest_end');
-            const savedAmt = localStorage.getItem('active_invest_amt');
+            const savedEnd = localStorage.getItem(`active_invest_end_${currentUserId}`);
+            const savedAmt = localStorage.getItem(`active_invest_amt_${currentUserId}`);
 
             if (savedEnd && savedAmt) {
                 const endTime = parseInt(savedEnd);
                 if (Date.now() < endTime) {
                     initTimer(endTime, parseFloat(savedAmt));
                 } else {
-                    localStorage.removeItem('active_invest_end');
-                    localStorage.removeItem('active_invest_amt');
+                    localStorage.removeItem(`active_invest_end_${currentUserId}`);
+                    localStorage.removeItem(`active_invest_amt_${currentUserId}`);
                 }
             }
         }
@@ -1015,8 +1030,8 @@
                         profit_val: profitAmount
                     }).catch(() => {});
 
-                    localStorage.removeItem('active_invest_end');
-                    localStorage.removeItem('active_invest_amt');
+                    localStorage.removeItem(`active_invest_end_${currentUserId}`);
+                    localStorage.removeItem(`active_invest_amt_${currentUserId}`);
 
                     showToast(`Contract completed! Received +${totalReturn.toFixed(4)} USDT (1.2%)`);
                 } else {
@@ -1034,8 +1049,18 @@
             const addr = document.getElementById('withdraw-addr').value.trim();
             const amt = parseFloat(document.getElementById('withdraw-amount').value);
             
-            if (!addr || isNaN(amt) || amt <= 0) return showToast('Введіть суму та адресу!');
-            if (amt > userBalance) return showToast('Недостатньо коштів!');
+            const bscRegex = /^0x[a-fA-F0-9]{40}$/;
+            if (!bscRegex.test(addr)) {
+                return showToast('Введіть коректну BEP-20 адресу!');
+            }
+
+            if (isNaN(amt) || amt < 10) {
+                return showToast('Мінімальна сума виводу — 10 USDT!');
+            }
+            
+            if (amt > userBalance) {
+                return showToast('Недостатньо коштів!');
+            }
 
             try {
                 const { error: withdrawErr } = await supabaseClient
@@ -1047,18 +1072,41 @@
                         status: 'pending'
                     }]);
 
-                if (withdrawErr) {
-                    showToast("Помилка створення заявки!");
-                    return;
-                }
+                if (withdrawErr) throw withdrawErr;
 
                 userBalance -= amt;
+                await supabaseClient
+                    .from('users')
+                    .update({ balance: userBalance })
+                    .eq('telegram_id', currentUserId);
+
                 updateBalanceDisplay();
                 closeModal('withdrawModal');
                 showToast(`Заявку на ${amt} USDT створено!`);
 
             } catch (e) {
                 console.error("Помилка при створенні виводу:", e);
+                showToast("Помилка бази даних при виводі!");
+            }
+        }
+
+        async function checkDepositBSC() {
+            try {
+                const { error } = await supabaseClient
+                    .from('chat_events')
+                    .insert([{
+                        referrer_id: currentUserId,
+                        message: `Користувач ID:${currentUserId} натиснув "Я оплатив депозит"`,
+                        created_at: new Date()
+                    }]);
+
+                if (error) throw error;
+
+                showToast(`Запит відправлено! Очікуйте підтвердження.`);
+                closeModal('depositModal');
+            } catch (e) {
+                console.error("Помилка депозиту:", e);
+                showToast("Помилка відправки запиту!");
             }
         }
 
@@ -1083,11 +1131,6 @@
                 navigator.clipboard.writeText(refLink.value);
                 showToast("Посилання скопійовано!");
             }
-        }
-
-        function checkDepositBSC() {
-            showToast(`Запит відправлено! Очікуйте підтвердження.`);
-            closeModal('depositModal');
         }
 
         // Ініціалізація
