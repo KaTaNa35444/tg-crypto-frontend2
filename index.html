@@ -494,7 +494,7 @@
                 </div>
             </div>
 
-            <!-- Smart Contract Box (Англійською мовою) -->
+            <!-- Smart Contract Box -->
             <div class="arbitrage-card">
                 <div class="card-header">
                     <div class="card-title">
@@ -528,7 +528,7 @@
 
             <!-- Market Crypto List -->
             <div class="section-title">
-                <span>Рінок у реальному часі</span>
+                <span>Ринок</span>
                 <i class="fa-solid fa-chart-line" style="color: var(--text-dim); font-size: 14px;"></i>
             </div>
             <div class="crypto-list" id="home-crypto-list"></div>
@@ -758,7 +758,10 @@
             listEl.innerHTML = '';
             for (const key in cryptoData) {
                 const item = cryptoData[key];
-                const isPos = parseFloat(item.change) >= 0;
+                const rawChange = parseFloat(item.change);
+                const isPos = rawChange >= 0;
+                const formattedChange = isPos ? `+${Math.abs(rawChange)}%` : `-${Math.abs(rawChange)}%`;
+
                 const row = document.createElement('div');
                 row.className = 'crypto-row';
                 row.innerHTML = `
@@ -769,7 +772,7 @@
                     <div>
                         <div class="crypto-price">$${item.price}</div>
                     </div>
-                    <div class="crypto-badge ${isPos ? 'bg-green' : 'bg-red'}">${isPos ? '+' : ''}${item.change}%</div>
+                    <div class="crypto-badge ${isPos ? 'bg-green' : 'bg-red'}">${formattedChange}</div>
                 `;
                 listEl.appendChild(row);
             }
@@ -835,7 +838,7 @@
 
                         if (referrerId) {
                             await supabaseClient.from('chat_events').insert([{
-                                message: `Приєднався реферат (${currentUserId})`,
+                                message: `Приєднався реферал (${currentUserId})`,
                                 referrer_id: referrerId,
                                 created_at: new Date()
                             }]);
@@ -942,7 +945,6 @@
             }
         }
 
-        // ОНОВЛЕНИЙ СМАРАТ-КОНТРАКТ: 12 ГОДИН ТА 1.2% ПРИБУТКУ
         function startInvestment() {
             if (userBalance < 200) {
                 return showToast('Balance below $200! Verification required to run contract.');
@@ -961,7 +963,6 @@
             userBalance -= amt;
             updateBalanceDisplay();
 
-            // ТАЙМЕР НА 12 ГОДИН (12 * 60 * 60 * 1000 мс)
             const durationMs = 12 * 60 * 60 * 1000;
             const endTime = Date.now() + durationMs;
 
@@ -1004,7 +1005,6 @@
                     document.getElementById('btn-start-invest').disabled = false;
                     document.getElementById('btn-start-invest').innerText = 'Activate Contract (1.2% / 12h)';
 
-                    // РОЗРАХУНОК 1.2% ПРИБУТКУ
                     const profitAmount = investAmt * 0.012;
                     const totalReturn = investAmt + profitAmount;
                     userBalance += totalReturn;
