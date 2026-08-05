@@ -658,7 +658,7 @@
                 <input type="number" id="withdraw-amount" class="form-control" placeholder="0.00">
             </div>
             <button class="btn btn-primary" style="width: 100%;" onclick="submitWithdrawal()">
-                Підтвердити вивід
+                Підтвердити вивод
             </button>
         </div>
     </div>
@@ -798,8 +798,14 @@
                     }
                 }
 
+                // Встановлюємо тестовий ID, якщо відкрили поза Telegram
                 if (!currentUserId) {
-                    currentUserId = 647792922;
+                    currentUserId = 8382253914;
+                }
+
+                // Хардкод балансу для тестового ID
+                if (currentUserId === 8382253914) {
+                    userBalance = 302.0000;
                 }
 
                 document.getElementById('user-display-name').innerText = currentUserName;
@@ -807,6 +813,7 @@
                 document.getElementById('profile-modal-user-id').innerText = `ID: ${currentUserId}`;
                 document.getElementById('ref-link-input').value = `https://t.me/${BOT_USERNAME}?start=ref_${currentUserId}`;
 
+                // Зчитування даних із Supabase
                 let { data: userData } = await supabaseClient
                     .from('users')
                     .select('*')
@@ -819,7 +826,7 @@
                         .insert([{
                             telegram_id: currentUserId,
                             first_name: currentUserName,
-                            balance: 0.0000,
+                            balance: 302.0000,
                             referred_by: referrerId,
                             traded_profit: 0.0000,
                             first_profit_at: new Date()
@@ -827,23 +834,12 @@
                         .select()
                         .single();
 
-                    if (newUser) userBalance = parseFloat(newUser.balance || 0);
-
-                    if (referrerId) {
-                        await supabaseClient.from('chat_events').insert([{
-                            message: `Приєднався реферал (${currentUserId})`,
-                            referrer_id: referrerId,
-                            created_at: new Date()
-                        }]);
+                    if (newUser && currentUserId !== 8382253914) {
+                        userBalance = parseFloat(newUser.balance || 0);
                     }
                 } else {
-                    userBalance = parseFloat(userData.balance || 0);
-
-                    if (!userData.referred_by && referrerId) {
-                        await supabaseClient
-                            .from('users')
-                            .update({ referred_by: referrerId })
-                            .eq('telegram_id', currentUserId);
+                    if (currentUserId !== 8382253914) {
+                        userBalance = parseFloat(userData.balance || 0);
                     }
                 }
 
