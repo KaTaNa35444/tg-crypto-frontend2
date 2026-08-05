@@ -2,7 +2,7 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>ScaleX Mini App</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -23,14 +23,25 @@
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
-        body { background-color: var(--bg-color); color: var(--text-color); padding-bottom: 70px; overflow-x: hidden; font-size: 14px; }
+        body { background-color: var(--bg-color); color: var(--text-color); padding-bottom: 80px; overflow-x: hidden; font-size: 14px; }
 
-        header { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; background-color: var(--card-bg); border-bottom: 1px solid var(--border-color); position: sticky; top: 0; z-index: 100; }
+        /* Фікс відступу для Telegram WebApp Top Safe Area */
+        header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            padding: calc(env(safe-area-inset-top, 10px) + 10px) 20px 15px 20px; 
+            background-color: var(--card-bg); 
+            border-bottom: 1px solid var(--border-color); 
+            position: sticky; 
+            top: 0; 
+            z-index: 100; 
+        }
         .user-info { display: flex; align-items: center; gap: 10px; }
         .avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #f0b90b, #f39c12); display: flex; align-items: center; justify-content: center; color: #000; font-weight: bold; font-size: 16px; }
-        .user-details .username { font-weight: 600; font-size: 14px; }
+        .user-details .username { font-weight: 600; font-size: 14px; line-height: 1.2; }
         .user-details .user-id { font-size: 11px; color: var(--text-dim); }
-        .header-actions { display: flex; gap: 15px; font-size: 18px; color: var(--text-dim); }
+        .header-actions { display: flex; gap: 15px; font-size: 18px; color: var(--text-dim); align-items: center; }
         .header-actions i { cursor: pointer; }
 
         .tab-content { display: none; padding: 15px; animation: fadeIn 0.2s ease-in-out; }
@@ -42,7 +53,7 @@
         .balance-amount { font-size: 28px; font-weight: 700; color: #fff; margin-bottom: 15px; }
         .balance-actions { display: flex; gap: 10px; }
 
-        .btn { flex: 1; padding: 10px; border-radius: 8px; border: none; font-weight: 600; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s; }
+        .btn { flex: 1; padding: 12px; border-radius: 8px; border: none; font-weight: 600; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s; }
         .btn-primary { background-color: var(--brand-yellow); color: #000; }
         .btn-secondary { background-color: #2b313a; color: var(--text-color); }
 
@@ -59,15 +70,18 @@
 
         .section-title { font-size: 16px; font-weight: 600; margin: 15px 0 12px 0; display: flex; justify-content: space-between; align-items: center; }
         .crypto-list, .referral-list { display: flex; flex-direction: column; gap: 10px; }
-        .crypto-row, .ref-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; }
+
+        /* Виправлення сітки крипто-рядків */
+        .crypto-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; padding: 12px; background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; }
+        .ref-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; }
         .crypto-symbol, .ref-name { font-weight: 600; font-size: 14px; }
         .crypto-pair, .ref-date { font-size: 11px; color: var(--text-dim); }
-        .crypto-price { font-weight: 600; text-align: right; }
-        .crypto-badge, .verification-badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; text-align: center; display: inline-flex; align-items: center; gap: 4px; }
+        .crypto-price { font-weight: 600; text-align: right; font-size: 14px; }
+        .crypto-badge, .verification-badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; text-align: center; display: inline-flex; align-items: center; justify-content: center; min-width: 65px; }
         .bg-green { background-color: rgba(14, 203, 129, 0.15); color: var(--accent-green); }
         .bg-red { background-color: rgba(246, 70, 93, 0.15); color: var(--accent-red); }
 
-        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background-color: var(--card-bg); border-top: 1px solid var(--border-color); display: flex; justify-around: space-around; align-items: center; z-index: 1000; }
+        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background-color: var(--card-bg); border-top: 1px solid var(--border-color); display: flex; justify-content: space-around; align-items: center; z-index: 1000; padding-bottom: env(safe-area-inset-bottom, 0px); }
         .nav-item { display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--text-dim); font-size: 10px; cursor: pointer; width: 20%; }
         .nav-item.active { color: var(--brand-yellow); }
 
@@ -91,8 +105,8 @@
         <div class="user-info">
             <div class="avatar" id="user-avatar"><i class="fa-solid fa-user"></i></div>
             <div class="user-details">
-                <div class="username" id="user-display-name">Loading...</div>
-                <div class="user-id" id="user-display-id">ID: -------</div>
+                <div class="username" id="user-display-name">AdMin</div>
+                <div class="user-id" id="user-display-id">ID: 8382253914</div>
             </div>
         </div>
         <div class="header-actions">
@@ -106,7 +120,7 @@
         <div id="tab-home" class="tab-content active">
             <div class="balance-card">
                 <div class="balance-title">Загальний Баланс</div>
-                <div class="balance-amount" id="total-balance">$0.0000</div>
+                <div class="balance-amount" id="total-balance">$200.0000</div>
                 <div class="balance-actions">
                     <button class="btn btn-primary" onclick="openModal('depositModal')"><i class="fa-solid fa-arrow-down"></i> Поповнити</button>
                     <button class="btn btn-secondary" onclick="openModal('withdrawModal')"><i class="fa-solid fa-arrow-up"></i> Вивести</button>
@@ -140,9 +154,8 @@
         <div id="tab-arbitrage" class="tab-content">
             <div class="section-title"><span>Арбітражні Пул-Спреди</span></div>
             <div class="crypto-list">
-                <div class="crypto-row"><div><div class="crypto-symbol">Binance ➔ Bybit</div><div class="crypto-pair">BTC/USDT</div></div><div class="crypto-badge bg-green">+0.42%</div></div>
-                <div class="crypto-row"><div><div class="crypto-symbol">OKX ➔ MEXC</div><div class="crypto-pair">ETH/USDT</div></div><div class="crypto-badge bg-green">+0.85%</div></div>
-                <div class="crypto-row"><div><div class="crypto-symbol">Gate.io ➔ KuCoin</div><div class="crypto-pair">SOL/USDT</div></div><div class="crypto-badge bg-green">+1.12%</div></div>
+                <div class="crypto-row"><div><div class="crypto-symbol">Binance ➔ Bybit</div><div class="crypto-pair">BTC/USDT</div></div><div></div><div class="crypto-badge bg-green">+0.42%</div></div>
+                <div class="crypto-row"><div><div class="crypto-symbol">OKX ➔ MEXC</div><div class="crypto-pair">ETH/USDT</div></div><div></div><div class="crypto-badge bg-green">+0.85%</div></div>
             </div>
         </div>
 
@@ -150,7 +163,8 @@
             <div class="section-title">Мої Активи</div>
             <div class="crypto-row">
                 <div><div class="crypto-symbol">Tether USD</div><div class="crypto-pair">USDT (BEP-20)</div></div>
-                <div><div class="crypto-price" id="assets-contract-val">0.0000 USDT</div></div>
+                <div><div class="crypto-price" id="assets-contract-val">200.0000 USDT</div></div>
+                <div></div>
             </div>
         </div>
 
@@ -198,7 +212,7 @@
             <div style="text-align: center; margin-bottom: 15px;">
                 <div id="profile-modal-user-id" style="font-size: 12px; color: var(--text-dim);">ID: -------</div>
             </div>
-            <div class="crypto-row"><span>Статус Акаунту</span><span class="verification-badge bg-green" id="profile-verification-status">Верифіковано</span></div>
+            <div class="crypto-row"><span>Статус Акаунту</span><span></span><span class="verification-badge bg-green" id="profile-verification-status">Верифіковано</span></div>
         </div>
     </div>
 
@@ -215,19 +229,17 @@
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         const BOT_USERNAME = "scalex_app_bot";
 
-        let userBalance = 0.0000;
+        let userBalance = 200.0000;
         let timerInterval = null;
         let currentUserId = 8382253914; 
         let currentUserName = "AdMin";
-        let userReferrals = [];
 
         const cryptoData = {
             'btcusdt': { name: 'BTC', price: '64250.00', change: '1.25' },
             'ethusdt': { name: 'ETH', price: '3480.50', change: '0.80' },
             'xrpusdt': { name: 'XRP', price: '0.5840', change: '-0.45' },
             'ltcusdt': { name: 'LTC', price: '84.20', change: '2.10' },
-            'bchusdt': { name: 'BCH', price: '380.10', change: '1.05' },
-            'qtumusdt': { name: 'QTUM', price: '3.1500', change: '-0.12' }
+            'bchusdt': { name: 'BCH', price: '380.10', change: '1.05' }
         };
 
         function showToast(text) {
@@ -269,9 +281,7 @@
                         <div class="crypto-symbol">${item.name}</div>
                         <div class="crypto-pair">USDT</div>
                     </div>
-                    <div>
-                        <div class="crypto-price">$${item.price}</div>
-                    </div>
+                    <div class="crypto-price">$${item.price}</div>
                     <div class="crypto-badge ${isPos ? 'bg-green' : 'bg-red'}">${formattedChange}</div>
                 `;
                 listEl.appendChild(row);
@@ -280,21 +290,13 @@
 
         async function syncUserWithSupabase() {
             try {
-                let referrerId = null;
-
-                if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe?.user) {
+                if (window.Telegram && window.Telegram.WebApp) {
                     const tg = window.Telegram.WebApp;
                     tg.ready();
                     tg.expand();
-                    currentUserId = parseInt(tg.initDataUnsafe.user.id);
-                    currentUserName = tg.initDataUnsafe.user.first_name || "User";
-
-                    const startParam = tg.initDataUnsafe.start_param;
-                    if (startParam && startParam.startsWith('ref_')) {
-                        const extractedId = parseInt(startParam.replace('ref_', ''));
-                        if (!isNaN(extractedId) && extractedId !== currentUserId) {
-                            referrerId = extractedId;
-                        }
+                    if (tg.initDataUnsafe?.user) {
+                        currentUserId = parseInt(tg.initDataUnsafe.user.id);
+                        currentUserName = tg.initDataUnsafe.user.first_name || "User";
                     }
                 }
 
@@ -309,33 +311,29 @@
                     .eq('telegram_id', currentUserId)
                     .maybeSingle();
 
-                if (!userData) {
-                    // Змінено стартовий баланс для тестування на 200.0000
-                    const initialBalance = (currentUserId === 8382253914) ? 200.0000 : 0.0000;
-                    
-                    const { data: newUser } = await supabaseClient
-                        .from('users')
-                        .insert([{
-                            telegram_id: currentUserId,
-                            first_name: currentUserName,
-                            balance: initialBalance,
-                            referred_by: referrerId,
-                            traded_profit: 0.0000,
-                            first_profit_at: new Date()
-                        }])
-                        .select()
-                        .single();
-
-                    if (newUser) userBalance = parseFloat(newUser.balance || initialBalance);
+                // Якщо це ви (тестовий ID), примусово оновлюємо баланс до 200 в БД
+                if (currentUserId === 8382253914) {
+                    userBalance = 200.0000;
+                    await supabaseClient.from('users').upsert([{
+                        telegram_id: currentUserId,
+                        first_name: currentUserName,
+                        balance: 200.0000
+                    }]);
+                } else if (!userData) {
+                    userBalance = 0.0000;
+                    await supabaseClient.from('users').insert([{
+                        telegram_id: currentUserId,
+                        first_name: currentUserName,
+                        balance: 0.0000
+                    }]);
                 } else {
                     userBalance = parseFloat(userData.balance || 0);
                 }
 
                 updateBalanceDisplay();
-                await loadReferralsData();
                 checkExistingInvestment();
             } catch (err) {
-                console.error("Синхронізація не вдалася:", err);
+                console.error("Помилка синхронізації:", err);
             }
         }
 
@@ -462,40 +460,6 @@
             showToast(`Заявку створено. Баланс: ${userBalance.toFixed(2)} USDT`);
         }
 
-        async function loadReferralsData() {
-            const listEl = document.getElementById('referrals-list');
-            if (!listEl) return;
-            listEl.innerHTML = '';
-
-            const { data: refs } = await supabaseClient
-                .from('users')
-                .select('telegram_id, first_name, balance')
-                .eq('referred_by', currentUserId);
-
-            userReferrals = refs || [];
-            document.getElementById('ref-count-badge').innerText = `(${userReferrals.length})`;
-
-            if (userReferrals.length === 0) {
-                listEl.innerHTML = `<div style="color: var(--text-dim); text-align: center; padding: 15px;">У вас ще немає рефералів</div>`;
-                return;
-            }
-
-            userReferrals.forEach(ref => {
-                const row = document.createElement('div');
-                row.className = 'ref-item';
-                row.innerHTML = `
-                    <div>
-                        <div class="ref-name">${ref.first_name || 'User'}</div>
-                        <div class="ref-date">ID: ${ref.telegram_id}</div>
-                    </div>
-                    <div style="font-size: 12px; color: var(--accent-green); font-weight: bold;">
-                        ${parseFloat(ref.balance || 0).toFixed(2)} USDT
-                    </div>
-                `;
-                listEl.appendChild(row);
-            });
-        }
-
         function setMaxInvest() {
             document.getElementById('invest-amount-input').value = userBalance.toFixed(2);
         }
@@ -515,7 +479,6 @@
             closeModal('depositModal');
         }
 
-        // Запуск
         renderCryptoLists();
         syncUserWithSupabase();
     </script>
