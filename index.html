@@ -142,6 +142,7 @@
             <div class="crypto-list">
                 <div class="crypto-row"><div><div class="crypto-symbol">Binance ➔ Bybit</div><div class="crypto-pair">BTC/USDT</div></div><div class="crypto-badge bg-green">+0.42%</div></div>
                 <div class="crypto-row"><div><div class="crypto-symbol">OKX ➔ MEXC</div><div class="crypto-pair">ETH/USDT</div></div><div class="crypto-badge bg-green">+0.85%</div></div>
+                <div class="crypto-row"><div><div class="crypto-symbol">Gate.io ➔ KuCoin</div><div class="crypto-pair">SOL/USDT</div></div><div class="crypto-badge bg-green">+1.12%</div></div>
             </div>
         </div>
 
@@ -217,8 +218,17 @@
         let userBalance = 0.0000;
         let timerInterval = null;
         let currentUserId = 8382253914; 
-        let currentUserName = "User";
+        let currentUserName = "AdMin";
         let userReferrals = [];
+
+        const cryptoData = {
+            'btcusdt': { name: 'BTC', price: '64250.00', change: '1.25' },
+            'ethusdt': { name: 'ETH', price: '3480.50', change: '0.80' },
+            'xrpusdt': { name: 'XRP', price: '0.5840', change: '-0.45' },
+            'ltcusdt': { name: 'LTC', price: '84.20', change: '2.10' },
+            'bchusdt': { name: 'BCH', price: '380.10', change: '1.05' },
+            'qtumusdt': { name: 'QTUM', price: '3.1500', change: '-0.12' }
+        };
 
         function showToast(text) {
             const toast = document.getElementById('toast-msg');
@@ -240,6 +250,32 @@
         function updateBalanceDisplay() {
             document.getElementById('total-balance').innerText = `$${userBalance.toFixed(4)}`;
             document.getElementById('assets-contract-val').innerText = `${userBalance.toFixed(4)} USDT`;
+        }
+
+        function renderCryptoLists() {
+            const listEl = document.getElementById('home-crypto-list');
+            if (!listEl) return;
+            listEl.innerHTML = '';
+            for (const key in cryptoData) {
+                const item = cryptoData[key];
+                const rawChange = parseFloat(item.change);
+                const isPos = rawChange >= 0;
+                const formattedChange = isPos ? `+${Math.abs(rawChange)}%` : `-${Math.abs(rawChange)}%`;
+
+                const row = document.createElement('div');
+                row.className = 'crypto-row';
+                row.innerHTML = `
+                    <div>
+                        <div class="crypto-symbol">${item.name}</div>
+                        <div class="crypto-pair">USDT</div>
+                    </div>
+                    <div>
+                        <div class="crypto-price">$${item.price}</div>
+                    </div>
+                    <div class="crypto-badge ${isPos ? 'bg-green' : 'bg-red'}">${formattedChange}</div>
+                `;
+                listEl.appendChild(row);
+            }
         }
 
         async function syncUserWithSupabase() {
@@ -267,21 +303,23 @@
                 document.getElementById('profile-modal-user-id').innerText = `ID: ${currentUserId}`;
                 document.getElementById('ref-link-input').value = `https://t.me/${BOT_USERNAME}?start=ref_${currentUserId}`;
 
-                // Перевіряємо наявність запису в Supabase
-                let { data: userData, error } = await supabaseClient
+                // Читаємо значення з Supabase
+                let { data: userData } = await supabaseClient
                     .from('users')
                     .select('*')
                     .eq('telegram_id', currentUserId)
                     .maybeSingle();
 
                 if (!userData) {
-                    // Якщо немає в БД — створюємо новий запис
+                    // Створюємо запис у базі з початковим балансом 302 для тестування
+                    const initialBalance = (currentUserId === 8382253914) ? 302.0000 : 0.0000;
+                    
                     const { data: newUser } = await supabaseClient
                         .from('users')
                         .insert([{
                             telegram_id: currentUserId,
                             first_name: currentUserName,
-                            balance: 300.0000,
+                            balance: initialBalance,
                             referred_by: referrerId,
                             traded_profit: 0.0000,
                             first_profit_at: new Date()
@@ -289,8 +327,9 @@
                         .select()
                         .single();
 
-                    if (newUser) userBalance = parseFloat(newUser.balance || 300);
+                    if (newUser) userBalance = parseFloat(newUser.balance || initialBalance);
                 } else {
+                    // Беремо реальний баланс із бази даних (щоб зберігалися виводи та стейкінг)
                     userBalance = parseFloat(userData.balance || 0);
                 }
 
@@ -316,7 +355,7 @@
 
             const newBalance = userBalance - amt;
 
-            // Збереження в Supabase
+            // Збереження нового балансу в Supabase
             const { error } = await supabaseClient
                 .from('users')
                 .update({ balance: newBalance })
@@ -404,7 +443,7 @@
 
             const newBalance = userBalance - amt;
 
-            // Списуємо баланс у Supabase
+            // Зменшуємо баланс у Supabase
             const { error: dbError } = await supabaseClient
                 .from('users')
                 .update({ balance: newBalance })
@@ -414,7 +453,7 @@
                 return showToast('Помилка бази даних при виводі!');
             }
 
-            // Записуємо заявку на вивід
+            // Фіксуємо транзакцію виводу
             await supabaseClient.from('withdrawals').insert([{
                 telegram_id: currentUserId,
                 amount: amt,
@@ -481,6 +520,8 @@
             closeModal('depositModal');
         }
 
+        // Запуск
+        renderCryptoLists();
         syncUserWithSupabase();
     </script>
 </body>
