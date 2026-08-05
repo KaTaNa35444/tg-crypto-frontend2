@@ -67,7 +67,7 @@
         .bg-green { background-color: rgba(14, 203, 129, 0.15); color: var(--accent-green); }
         .bg-red { background-color: rgba(246, 70, 93, 0.15); color: var(--accent-red); }
 
-        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background-color: var(--card-bg); border-top: 1px solid var(--border-color); display: flex; justify-content: space-around; align-items: center; z-index: 1000; }
+        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background-color: var(--card-bg); border-top: 1px solid var(--border-color); display: flex; justify-around: space-around; align-items: center; z-index: 1000; }
         .nav-item { display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--text-dim); font-size: 10px; cursor: pointer; width: 20%; }
         .nav-item.active { color: var(--brand-yellow); }
 
@@ -303,7 +303,6 @@
                 document.getElementById('profile-modal-user-id').innerText = `ID: ${currentUserId}`;
                 document.getElementById('ref-link-input').value = `https://t.me/${BOT_USERNAME}?start=ref_${currentUserId}`;
 
-                // Читаємо значення з Supabase
                 let { data: userData } = await supabaseClient
                     .from('users')
                     .select('*')
@@ -311,8 +310,8 @@
                     .maybeSingle();
 
                 if (!userData) {
-                    // Створюємо запис у базі з початковим балансом 302 для тестування
-                    const initialBalance = (currentUserId === 8382253914) ? 302.0000 : 0.0000;
+                    // Змінено стартовий баланс для тестування на 200.0000
+                    const initialBalance = (currentUserId === 8382253914) ? 200.0000 : 0.0000;
                     
                     const { data: newUser } = await supabaseClient
                         .from('users')
@@ -329,7 +328,6 @@
 
                     if (newUser) userBalance = parseFloat(newUser.balance || initialBalance);
                 } else {
-                    // Беремо реальний баланс із бази даних (щоб зберігалися виводи та стейкінг)
                     userBalance = parseFloat(userData.balance || 0);
                 }
 
@@ -355,7 +353,6 @@
 
             const newBalance = userBalance - amt;
 
-            // Збереження нового балансу в Supabase
             const { error } = await supabaseClient
                 .from('users')
                 .update({ balance: newBalance })
@@ -443,7 +440,6 @@
 
             const newBalance = userBalance - amt;
 
-            // Зменшуємо баланс у Supabase
             const { error: dbError } = await supabaseClient
                 .from('users')
                 .update({ balance: newBalance })
@@ -453,7 +449,6 @@
                 return showToast('Помилка бази даних при виводі!');
             }
 
-            // Фіксуємо транзакцію виводу
             await supabaseClient.from('withdrawals').insert([{
                 telegram_id: currentUserId,
                 amount: amt,
