@@ -102,7 +102,7 @@
             <div class="avatar" id="user-avatar"><i class="fa-solid fa-user"></i></div>
             <div class="user-details">
                 <div class="username" id="user-display-name">AdMin</div>
-                <div class="user-id" id="user-display-id">ID: 8382253914</div>
+                <div class="user-id" id="user-display-id">ID: -------</div>
             </div>
         </div>
         <div class="header-actions">
@@ -116,7 +116,7 @@
         <div id="tab-home" class="tab-content active">
             <div class="balance-card">
                 <div class="balance-title">Загальний Баланс</div>
-                <div class="balance-amount" id="total-balance">$200.0000</div>
+                <div class="balance-amount" id="total-balance">$0.0000</div>
                 <div class="balance-actions">
                     <button class="btn btn-primary" onclick="openModal('depositModal')"><i class="fa-solid fa-arrow-down"></i> Поповнити</button>
                     <button class="btn btn-secondary" onclick="openModal('withdrawModal')"><i class="fa-solid fa-arrow-up"></i> Вивести</button>
@@ -159,7 +159,7 @@
             <div class="section-title">Мої Активи</div>
             <div class="crypto-row">
                 <div><div class="crypto-symbol">Tether USD</div><div class="crypto-pair">USDT (BEP-20)</div></div>
-                <div><div class="crypto-price" id="assets-contract-val">200.0000 USDT</div></div>
+                <div><div class="crypto-price" id="assets-contract-val">0.0000 USDT</div></div>
                 <div></div>
             </div>
         </div>
@@ -225,10 +225,13 @@
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         const BOT_USERNAME = "scalex_app_bot";
 
-        let userBalance = parseFloat(localStorage.getItem('user_local_balance')) || 200.0000;
+        // Масив з Telegram ID тестерів (додавайте сюди ID для тестового балансу)
+        const TESTER_IDS = [8382253914];
+
+        let userBalance = 0.0000;
         let timerInterval = null;
         let currentUserId = 8382253914; 
-        let currentUserName = "AdMin";
+        let currentUserName = "User";
 
         const cryptoData = {
             'btcusdt': { name: 'BTC', price: '64250.00', change: '1.25' },
@@ -258,7 +261,7 @@
         function updateBalanceDisplay() {
             document.getElementById('total-balance').innerText = `$${userBalance.toFixed(4)}`;
             document.getElementById('assets-contract-val').innerText = `${userBalance.toFixed(4)} USDT`;
-            localStorage.setItem('user_local_balance', userBalance);
+            localStorage.setItem(`user_local_balance_${currentUserId}`, userBalance);
         }
 
         function renderCryptoLists() {
@@ -302,49 +305,60 @@
                 document.getElementById('profile-modal-user-id').innerText = `ID: ${currentUserId}`;
                 document.getElementById('ref-link-input').value = `https://t.me/${BOT_USERNAME}?start=ref_${currentUserId}`;
 
-                // Використовуємо upsert замість розсічених методів
-                await supabaseClient.from('users').upsert({
-                    telegram_id: currentUserId,
-                    first_name: currentUserName,
-                    balance: userBalance
-                }, { onConflict: 'telegram_id' });
+                const savedLocalBalance = localStorage.getItem(`user_local_balance_${currentUserId}`);
+
+                if (savedLocalBalance !== null) {
+                    userBalance = parseFloat(savedLocalBalance);
+                } else if (TESTER_IDS.includes(currentUserId)) {
+                    // Стартовий баланс 200 USDT нараховується ТІЛЬКИ ТЕСТЕРАМ
+                    userBalance = 200.0000;
+                } else {
+                    // Для звичайних користувачів баланс за замовчуванням 0.0000
+                    userBalance = 0.0000;
+                }
+
+                // Перевірка активного або завершеного стейкінгу
+                await checkExistingInvestment();
+
+                // Синхронізація з Supabase
+                try {
+                    await supabaseClient.from('users').upsert({
+                        telegram_id: currentUserId,
+                        first_name: currentUserName,
+                        balance: userBalance
+                    }, { onConflict: 'telegram_id' });
+                } catch (e) {}
 
                 updateBalanceDisplay();
-                checkExistingInvestment();
             } catch (err) {
-                console.error("Синхронізація обмежена:", err);
+                console.error("Помилка ініціалізації:", err);
             }
         }
 
         async function startInvestment() {
-            if (userBalance < 10) {
-                return showToast('Недостатньо балансу!');
-            }
-
             const amountInput = document.getElementById('invest-amount-input');
             const amt = parseFloat(amountInput.value);
 
-            if (isNaN(amt) || amt <= 0 || amt > userBalance) {
-                return showToast('Вкажіть коректну суму!');
+            if (isNaN(amt) || amt < 10) {
+                return showToast('Мінімальна сума стейкінгу: 10 USDT');
             }
 
-            const newBalance = userBalance - amt;
+            if (amt > userBalance) {
+                return showToast('Недостатньо балансу!');
+            }
 
-            // Спочатку змінюємо стан локально
-            userBalance = newBalance;
+            // Списуємо суму стейкінгу з основного балансу
+            userBalance = userBalance - amt;
             updateBalanceDisplay();
 
-            // Потім синхронізуємо з БД
             try {
                 await supabaseClient.from('users').upsert({
                     telegram_id: currentUserId,
-                    balance: newBalance
+                    balance: userBalance
                 }, { onConflict: 'telegram_id' });
-            } catch (e) {
-                console.warn("Не вдалося синхронізувати з DB, але локальний баланс збережено");
-            }
+            } catch (e) {}
 
-            const durationMs = 12 * 60 * 60 * 1000;
+            const durationMs = 12 * 60 * 60 * 1000; // 12 годин
             const endTime = Date.now() + durationMs;
 
             localStorage.setItem(`active_invest_end_${currentUserId}`, endTime);
@@ -354,14 +368,29 @@
             showToast('Контракт активовано!');
         }
 
-        function checkExistingInvestment() {
+        async function checkExistingInvestment() {
             const savedEnd = localStorage.getItem(`active_invest_end_${currentUserId}`);
             const savedAmt = localStorage.getItem(`active_invest_amt_${currentUserId}`);
 
             if (savedEnd && savedAmt) {
                 const endTime = parseInt(savedEnd);
-                if (Date.now() < endTime) {
-                    initTimer(endTime, parseFloat(savedAmt));
+                const investAmt = parseFloat(savedAmt);
+
+                if (Date.now() >= endTime) {
+                    // Якщо контракт завершився, поки додаток був закритий:
+                    // Повертаємо тіло депозиту + 1.2% прибутку
+                    const profitAmount = investAmt * 0.012;
+                    const totalReturn = investAmt + profitAmount;
+                    
+                    userBalance += totalReturn;
+                    
+                    localStorage.removeItem(`active_invest_end_${currentUserId}`);
+                    localStorage.removeItem(`active_invest_amt_${currentUserId}`);
+
+                    showToast(`Стейкінг виплачено: +${totalReturn.toFixed(4)} USDT`);
+                } else {
+                    // Якщо таймер ще активний, продовжуємо відлік
+                    initTimer(endTime, investAmt);
                 }
             }
         }
@@ -380,9 +409,11 @@
                     document.getElementById('active-timer-box').style.display = 'none';
                     document.getElementById('btn-start-invest').disabled = false;
 
+                    // Нарахування повернення депозиту + 1.2%
                     const profitAmount = investAmt * 0.012;
                     const totalReturn = investAmt + profitAmount;
-                    userBalance = userBalance + totalReturn;
+                    
+                    userBalance += totalReturn;
                     updateBalanceDisplay();
 
                     try {
@@ -395,7 +426,7 @@
                     localStorage.removeItem(`active_invest_end_${currentUserId}`);
                     localStorage.removeItem(`active_invest_amt_${currentUserId}`);
 
-                    showToast(`Контракт виплачено: +${totalReturn.toFixed(4)} USDT`);
+                    showToast(`Контракт завершено: +${totalReturn.toFixed(4)} USDT`);
                 } else {
                     const hrs = Math.floor(diff / (1000 * 60 * 60));
                     const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
