@@ -53,6 +53,7 @@
 
         .btn { flex: 1; padding: 12px; border-radius: 8px; border: none; font-weight: 600; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s; }
         .btn-primary { background-color: var(--brand-yellow); color: #000; }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
         .btn-secondary { background-color: #2b313a; color: var(--text-color); }
 
         .arbitrage-card { background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px; margin-bottom: 20px; }
@@ -101,7 +102,7 @@
         <div class="user-info">
             <div class="avatar" id="user-avatar"><i class="fa-solid fa-user"></i></div>
             <div class="user-details">
-                <div class="username" id="user-display-name">AdMin</div>
+                <div class="username" id="user-display-name">User</div>
                 <div class="user-id" id="user-display-id">ID: -------</div>
             </div>
         </div>
@@ -187,9 +188,15 @@
     <div class="modal" id="depositModal">
         <div class="modal-content">
             <div class="modal-header"><span>Поповнення USDT (BEP-20)</span><i class="fa-solid fa-xmark close-modal" onclick="closeModal('depositModal')"></i></div>
+            <div style="font-size: 11px; color: var(--text-dim); margin-bottom: 8px;">Перерахуйте USDT (BEP-20) на адресу:</div>
             <div class="wallet-address-box"><input type="text" id="my-wallet-addr" value="0x71C7656EC7ab88b098defB751B7401B5f6d8976F" readonly style="width:100%; background:none; border:none; color:#fff; text-align:center;"></div>
-            <button class="btn btn-secondary" style="width: 100%; margin-bottom: 10px;" onclick="copyWallet()">Скопіювати Адресу</button>
-            <button class="btn btn-primary" style="width: 100%;" onclick="checkDepositBSC()">Я оплатив</button>
+            <button class="btn btn-secondary" style="width: 100%; margin-bottom: 15px;" onclick="copyWallet()">Скопіювати Адресу</button>
+            
+            <div class="form-group">
+                <label>Хеш транзакції (TxHash):</label>
+                <input type="text" id="deposit-tx-hash" class="form-control" placeholder="0x...">
+            </div>
+            <button class="btn btn-primary" id="btn-verify-deposit" style="width: 100%;" onclick="verifyRealDeposit()">Перевірити платіж</button>
         </div>
     </div>
 
@@ -225,7 +232,12 @@
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         const BOT_USERNAME = "scalex_app_bot";
 
-        // Масив з Telegram ID тестерів (додавайте сюди ID для тестового балансу)
+        // Офіційний контракт USDT у мережі BEP-20 (BNB Smart Chain)
+        const USDT_BEP20_CONTRACT = "0x55d398326f99059f1706928e0862024e031024225".toLowerCase();
+        // Зафіксована адреса отримувача
+        const TARGET_DEPOSIT_WALLET = "0x71C7656EC7ab88b098defB751B7401B5f6d8976F".toLowerCase();
+
+        // Тестери (отримують 200 USDT стартового балансу лише при першому запуску)
         const TESTER_IDS = [8382253914];
 
         let userBalance = 0.0000;
@@ -310,17 +322,13 @@
                 if (savedLocalBalance !== null) {
                     userBalance = parseFloat(savedLocalBalance);
                 } else if (TESTER_IDS.includes(currentUserId)) {
-                    // Стартовий баланс 200 USDT нараховується ТІЛЬКИ ТЕСТЕРАМ
                     userBalance = 200.0000;
                 } else {
-                    // Для звичайних користувачів баланс за замовчуванням 0.0000
                     userBalance = 0.0000;
                 }
 
-                // Перевірка активного або завершеного стейкінгу
                 await checkExistingInvestment();
 
-                // Синхронізація з Supabase
                 try {
                     await supabaseClient.from('users').upsert({
                         telegram_id: currentUserId,
@@ -332,6 +340,119 @@
                 updateBalanceDisplay();
             } catch (err) {
                 console.error("Помилка ініціалізації:", err);
+            }
+        }
+
+        // РЕАЛЬНА ОНЧЕЙН ПЕРЕВІРКА ПОПОВНЕННЯ В БЛОКЧЕЙНІ BSC
+        async function verifyRealDeposit() {
+            const txInput = document.getElementById('deposit-tx-hash');
+            const txHash = txInput.value.trim();
+            const btn = document.getElementById('btn-verify-deposit');
+
+            if (!txHash.match(/^0x[a-fA-F0-9]{64}$/)) {
+                return showToast('Некоректний формат TxHash!');
+            }
+
+            btn.disabled = true;
+            btn.innerText = "Перевірка в блокчейні...";
+
+            try {
+                // 1. Перевірка на повторне використання хешу в Supabase
+                const { data: existingTx } = await supabaseClient
+                    .from('deposits')
+                    .select('tx_hash')
+                    .eq('tx_hash', txHash)
+                    .maybeSingle();
+
+                if (existingTx) {
+                    btn.disabled = false;
+                    btn.innerText = "Перевірити платіж";
+                    return showToast('Цей хеш вже оброблено!');
+                }
+
+                // 2. Отримання квитанції транзакції з BSC Node
+                const rpcResponse = await fetch('https://bsc-dataseed.binance.org/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        jsonrpc: "2.0",
+                        id: 1,
+                        method: "eth_getTransactionReceipt",
+                        params: [txHash]
+                    })
+                });
+
+                const rpcData = await rpcResponse.json();
+                const receipt = rpcData?.result;
+
+                if (!receipt) {
+                    btn.disabled = false;
+                    btn.innerText = "Перевірити платіж";
+                    return showToast('Транзакцію не знайдено в BSC!');
+                }
+
+                // Перевірка статусу (0x1 = успішно)
+                if (receipt.status !== "0x1") {
+                    btn.disabled = false;
+                    btn.innerText = "Перевірити платіж";
+                    return showToast('Транзакцію було відхилено!');
+                }
+
+                // 3. Пошук події Transfer USDT на наший гаманець
+                let depositedAmount = 0;
+                const transferEventTopic = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+
+                for (const log of receipt.logs) {
+                    const logContract = log.address.toLowerCase();
+                    const isUsdt = logContract === USDT_BEP20_CONTRACT;
+
+                    if (isUsdt && log.topics && log.topics[0] === transferEventTopic && log.topics.length >= 3) {
+                        const recipientHex = "0x" + log.topics[2].substring(26).toLowerCase();
+                        
+                        if (recipientHex === TARGET_DEPOSIT_WALLET) {
+                            // Декодування кількості USDT (BEP-20 має 18 десяткових знаків)
+                            const rawHexData = log.data;
+                            const BigIntAmount = BigInt(rawHexData);
+                            depositedAmount = Number(BigIntAmount) / 1e18;
+                            break;
+                        }
+                    }
+                }
+
+                if (depositedAmount <= 0) {
+                    btn.disabled = false;
+                    btn.innerText = "Перевірити платіж";
+                    return showToast('Поповнення USDT на нашу адресу не виявлено!');
+                }
+
+                // 4. Нарахування коштів та запис у базу даних
+                userBalance = parseFloat((userBalance + depositedAmount).toFixed(4));
+                updateBalanceDisplay();
+
+                // Запис поповнення
+                await supabaseClient.from('deposits').insert([{
+                    telegram_id: currentUserId,
+                    tx_hash: txHash,
+                    amount: depositedAmount,
+                    status: 'completed'
+                }]);
+
+                // Оновлення балансу користувача
+                await supabaseClient.from('users').upsert({
+                    telegram_id: currentUserId,
+                    balance: userBalance
+                }, { onConflict: 'telegram_id' });
+
+                txInput.value = "";
+                closeModal('depositModal');
+                showToast(`Зараховано +${depositedAmount.toFixed(4)} USDT!`);
+
+            } catch (err) {
+                console.error(err);
+                showToast('Помилка при перевірці!');
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "Перевірити платіж";
             }
         }
 
@@ -347,8 +468,7 @@
                 return showToast('Недостатньо балансу!');
             }
 
-            // Списуємо суму стейкінгу з основного балансу
-            userBalance = userBalance - amt;
+            userBalance = parseFloat((userBalance - amt).toFixed(4));
             updateBalanceDisplay();
 
             try {
@@ -358,7 +478,7 @@
                 }, { onConflict: 'telegram_id' });
             } catch (e) {}
 
-            const durationMs = 12 * 60 * 60 * 1000; // 12 годин
+            const durationMs = 12 * 60 * 60 * 1000;
             const endTime = Date.now() + durationMs;
 
             localStorage.setItem(`active_invest_end_${currentUserId}`, endTime);
@@ -377,19 +497,16 @@
                 const investAmt = parseFloat(savedAmt);
 
                 if (Date.now() >= endTime) {
-                    // Якщо контракт завершився, поки додаток був закритий:
-                    // Повертаємо тіло депозиту + 1.2% прибутку
                     const profitAmount = investAmt * 0.012;
                     const totalReturn = investAmt + profitAmount;
                     
-                    userBalance += totalReturn;
+                    userBalance = parseFloat((userBalance + totalReturn).toFixed(4));
                     
                     localStorage.removeItem(`active_invest_end_${currentUserId}`);
                     localStorage.removeItem(`active_invest_amt_${currentUserId}`);
 
                     showToast(`Стейкінг виплачено: +${totalReturn.toFixed(4)} USDT`);
                 } else {
-                    // Якщо таймер ще активний, продовжуємо відлік
                     initTimer(endTime, investAmt);
                 }
             }
@@ -409,11 +526,10 @@
                     document.getElementById('active-timer-box').style.display = 'none';
                     document.getElementById('btn-start-invest').disabled = false;
 
-                    // Нарахування повернення депозиту + 1.2%
                     const profitAmount = investAmt * 0.012;
                     const totalReturn = investAmt + profitAmount;
                     
-                    userBalance += totalReturn;
+                    userBalance = parseFloat((userBalance + totalReturn).toFixed(4));
                     updateBalanceDisplay();
 
                     try {
@@ -448,7 +564,7 @@
                 return showToast('Некоректна сума!');
             }
 
-            userBalance = userBalance - amt;
+            userBalance = parseFloat((userBalance - amt).toFixed(4));
             updateBalanceDisplay();
 
             try {
@@ -481,11 +597,6 @@
         function copyRefLink() {
             navigator.clipboard.writeText(document.getElementById("ref-link-input").value);
             showToast("Посилання скопійовано!");
-        }
-
-        function checkDepositBSC() {
-            showToast("Запит відправлено!");
-            closeModal('depositModal');
         }
 
         renderCryptoLists();
